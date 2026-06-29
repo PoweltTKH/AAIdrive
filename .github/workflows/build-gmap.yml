@@ -5,7 +5,7 @@ on:
 
 env:
   AndroidAutoIdrive_GmapsApiKey: ${{ secrets.ANDROIDAUTOIDRIVE_GMAPSAPIKEY }}
-  AndroidAutoIdrive_SpotifyApiKey: unset
+  AndroidAutoIdrive_SpotifyApiKey: ${{ secrets.ANDROIDAUTOIDRIVE_SPOTIFYAPIKEY }}
 
 jobs:
   build:
@@ -29,7 +29,7 @@ jobs:
       - name: Pobranie zaleznosci (certyfikaty BMW Connected)
         uses: ./.github/actions/download-externals-action
 
-      - name: Build flavor Google Maps (APK debug)
+      - name: Build flavor Google Maps + Spotify (APK debug)
         run: ./gradlew assembleGmapNonalyticsFullDebug --stacktrace
 
       - name: Wrzucenie APK do artefaktow builda
