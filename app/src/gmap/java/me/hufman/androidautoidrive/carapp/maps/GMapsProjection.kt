@@ -28,12 +28,11 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	var mapListener: Runnable? = null
 	var currentStyleId: Int? = null
 
-	// widoki paska prowadzenia turn-by-turn
-	private var navBanner: View? = null
+	// widoki panelu prowadzenia turn-by-turn (panel z lewej)
+	private var navPanel: View? = null
 	private var navArrow: TextView? = null
 	private var navInstruction: TextView? = null
 	private var navDistance: TextView? = null
-	private var navInfoBar: View? = null
 	private var navEta: TextView? = null
 	private var navRemaining: TextView? = null
 	private var navSpeed: TextView? = null
@@ -58,12 +57,11 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		window?.setType(WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION)
 		setContentView(R.layout.gmaps_projection)
 
-		// referencje do paska prowadzenia
-		navBanner = findViewById(R.id.navBanner)
+		// referencje do panelu prowadzenia
+		navPanel = findViewById(R.id.navPanel)
 		navArrow = findViewById(R.id.navArrow)
 		navInstruction = findViewById(R.id.navInstruction)
 		navDistance = findViewById(R.id.navDistance)
-		navInfoBar = findViewById(R.id.navInfoBar)
 		navEta = findViewById(R.id.navEta)
 		navRemaining = findViewById(R.id.navRemaining)
 		navSpeed = findViewById(R.id.navSpeed)
@@ -90,15 +88,13 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		}
 	}
 
-	/** Aktualizuje pasek prowadzenia; null = ukryj (brak nawigacji) */
+	/** Aktualizuje panel prowadzenia; null = ukryj (brak nawigacji) */
 	fun updateGuidance(g: NavigationGuidance?) {
 		if (g == null) {
-			navBanner?.visibility = View.GONE
-			navInfoBar?.visibility = View.GONE
+			navPanel?.visibility = View.GONE
 			return
 		}
-		navBanner?.visibility = View.VISIBLE
-		navInfoBar?.visibility = View.VISIBLE
+		navPanel?.visibility = View.VISIBLE
 		navArrow?.text = g.maneuverArrow
 		navInstruction?.text = g.maneuverText
 		navDistance?.text = formatDistance(g.distanceToTurnMeters)
@@ -138,12 +134,13 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 
 		val location = this.locationSource.location
 		val mapstyleId = when(style) {
-			"auto" -> if (location == null || TimeUtils.getDayMode(LatLong(location.latitude, location.longitude))) null else R.raw.gmaps_style_night
+			// odchudzony styl (slim) w dzien/normalnie -> mniej detalu = mniejsze klatki + czytelniej
+			"auto" -> if (location == null || TimeUtils.getDayMode(LatLong(location.latitude, location.longitude))) R.raw.gmaps_style_slim else R.raw.gmaps_style_night
 			"hybrid" -> null
 			"night" -> R.raw.gmaps_style_night
 			"aubergine" -> R.raw.gmaps_style_aubergine
 			"midnight_commander" -> R.raw.gmaps_style_midnight_commander
-			else -> null
+			else -> R.raw.gmaps_style_slim
 		}
 		if (mapstyleId != currentStyleId) {
 			Log.i(TAG, "Setting gmap style to $style")
