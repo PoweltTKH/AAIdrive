@@ -7,7 +7,9 @@ import android.graphics.Point
 import android.os.Bundle
 import android.util.Log
 import android.view.Display
+import android.view.View
 import android.view.WindowManager
+import android.widget.TextView
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.MapsInitializer
@@ -25,6 +27,16 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	var map: GoogleMap? = null
 	var mapListener: Runnable? = null
 	var currentStyleId: Int? = null
+
+	// widoki paska prowadzenia turn-by-turn
+	private var navBanner: View? = null
+	private var navArrow: TextView? = null
+	private var navInstruction: TextView? = null
+	private var navDistance: TextView? = null
+	private var navInfoBar: View? = null
+	private var navEta: TextView? = null
+	private var navRemaining: TextView? = null
+	private var navSpeed: TextView? = null
 
 	val fullDimensions = display.run {
 		val small = Point()
@@ -46,6 +58,16 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		window?.setType(WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION)
 		setContentView(R.layout.gmaps_projection)
 
+		// referencje do paska prowadzenia
+		navBanner = findViewById(R.id.navBanner)
+		navArrow = findViewById(R.id.navArrow)
+		navInstruction = findViewById(R.id.navInstruction)
+		navDistance = findViewById(R.id.navDistance)
+		navInfoBar = findViewById(R.id.navInfoBar)
+		navEta = findViewById(R.id.navEta)
+		navRemaining = findViewById(R.id.navRemaining)
+		navSpeed = findViewById(R.id.navSpeed)
+
 		val gmapView = findViewById<MapView>(R.id.gmapView)
 		gmapView.onCreate(savedInstanceState)
 		gmapView.getMapAsync { map ->
@@ -66,6 +88,33 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 
 			mapListener?.run()
 		}
+	}
+
+	/** Aktualizuje pasek prowadzenia; null = ukryj (brak nawigacji) */
+	fun updateGuidance(g: NavigationGuidance?) {
+		if (g == null) {
+			navBanner?.visibility = View.GONE
+			navInfoBar?.visibility = View.GONE
+			return
+		}
+		navBanner?.visibility = View.VISIBLE
+		navInfoBar?.visibility = View.VISIBLE
+		navArrow?.text = g.maneuverArrow
+		navInstruction?.text = g.maneuverText
+		navDistance?.text = formatDistance(g.distanceToTurnMeters)
+		navRemaining?.text = formatDistance(g.remainingDistanceMeters)
+		navEta?.text = formatEta(g.etaEpochMillis)
+		navSpeed?.text = "${g.speedKmh} km/h"
+	}
+
+	private fun formatDistance(m: Double): String {
+		return if (m < 1000) "${(Math.round(m / 10.0) * 10).toInt()} m"
+		else "%.1f km".format(m / 1000.0)
+	}
+
+	private fun formatEta(epochMillis: Long): String {
+		val sdf = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
+		return sdf.format(Date(epochMillis))
 	}
 
 	override fun onStart() {
