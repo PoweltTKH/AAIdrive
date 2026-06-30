@@ -17,10 +17,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 class GMapsController(private val context: Context,
-                      private val carLocationProvider: CarLocationProvider,
-                      private val virtualDisplay: VirtualDisplay,
-                      private val appSettings: AppSettingsObserver,
-                      private val mapAppMode: MapAppMode): MapInteractionController {
+                     private val carLocationProvider: CarLocationProvider,
+                     private val virtualDisplay: VirtualDisplay,
+                     private val appSettings: AppSettingsObserver,
+                     private val mapAppMode: MapAppMode): MapInteractionController {
 	val TAG = "GMapsController"
 	var handler = Handler(context.mainLooper)
 	var projection: GMapsProjection? = null
@@ -29,6 +29,10 @@ class GMapsController(private val context: Context,
 
 	private var lastSettingsTime = 0L   // the last time we checked settings, for day/night check
 	private val SETTINGS_TIME_INTERVAL = 5 * 60000  // milliseconds between checking day/night
+
+	// throttling odswiezania panelu prowadzenia (oszczedza pasmo: mniej zmian obrazu do wyslania)
+	private val GUIDANCE_UI_INTERVAL_MS = 1000L
+	private var lastGuidanceUiMs = 0L
 
 	val navController = GMapsNavController.getInstance(context, carLocationProvider) {
 		drawNavigation()
@@ -113,10 +117,14 @@ class GMapsController(private val context: Context,
 		// move the map dot to the new location
 		gMapLocationSource.onLocationUpdate(location)
 
-		// aktualizuj pasek prowadzenia turn-by-turn
+		// aktualizuj panel prowadzenia turn-by-turn (throttlowany do ~1/s)
 		if (navController.currentNavDestination != null) {
 			val guidance = navController.updateGuidance(location)
-			projection?.updateGuidance(guidance)
+			val now = System.currentTimeMillis()
+			if (now - lastGuidanceUiMs >= GUIDANCE_UI_INTERVAL_MS) {
+				projection?.updateGuidance(guidance)
+				lastGuidanceUiMs = now
+			}
 		} else {
 			projection?.updateGuidance(null)
 		}
