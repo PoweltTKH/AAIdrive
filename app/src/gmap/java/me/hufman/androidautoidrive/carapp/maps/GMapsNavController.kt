@@ -24,17 +24,16 @@ data class NavigationGuidance(
 		val maneuverText: String,
 		val distanceToTurnMeters: Double,
 		val remainingDistanceMeters: Double,
-		val etaEpochMillis: Long,
-		val speedKmh: Int
+		val etaEpochMillis: Long
 )
 
 class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: CarLocationProvider, var callback: (GMapsNavController) -> Unit) {
 	val TAG = "GMapsNavController"
 
 	companion object {
-		// zjazd z trasy: prog odleglosci od linii trasy i minimalny odstep miedzy przeliczeniami
+		// zjazd z trasy: prog odleglosci od trasy i minimalny odstep miedzy przeliczeniami
 		private const val OFFROUTE_THRESHOLD_M = 70.0
-		private const val REROUTE_MIN_INTERVAL_MS = 12000L
+		private const val REROUTE_MIN_INTERVAL_MS = 10000L
 
 		fun getInstance(context: Context, locationProvider: CarLocationProvider, callback: (GMapsNavController) -> Unit): GMapsNavController {
 			val api_key = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
@@ -53,15 +52,10 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	var currentNavRoute: List<LatLng>? = null
 		private set
 
-	// kroki trasy do prowadzenia turn-by-turn
+	// kroki trasy + detaliczna geometria kazdego kroku (do dokladnego dopasowania pozycji)
 	private var steps: List<DirectionsStep> = emptyList()
+	private var stepPaths: List<List<LatLng>> = emptyList()
 	private var currentStepIndex: Int = 0
-
-	// liczenie predkosci z przesuniecia pozycji GPS (pole predkosci z auta bywa smieciowe)
-	private var lastSpeedLat: Double? = null
-	private var lastSpeedLng: Double? = null
-	private var lastSpeedTimeMs: Long = 0L
-	private var smoothedSpeedKmh: Double = 0.0
 
 	// wykrywanie zjazdu z trasy
 	private var offRouteCount: Int = 0
@@ -78,6 +72,7 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		currentNavDestination = null
 		currentNavRoute = null
 		steps = emptyList()
+		stepPaths = emptyList()
 		currentStepIndex = 0
 		offRouteCount = 0
 		callback(this)
@@ -102,14 +97,18 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				if (result == null || result.routes.isEmpty()) { return }
 				Log.i(TAG, "Adding route to map")
 				val route = result.routes[0]
-				// linia trasy (jak dotychczas)
-				val decodedPath = route.overviewPolyline.decodePath()
-				currentNavRoute = decodedPath.map {
-					LatLng(it.lat, it.lng)
-				}
 				// kroki manewrow ze wszystkich odcinkow trasy
-				steps = route.legs.flatMap { it.steps.toList() }
+				val newSteps = route.legs.flatMap { it.steps.toList() }
+				// detaliczna geometria kazdego kroku (dokladniejsza niz overviewPolyline)
+				val newStepPaths = newSteps.map { step ->
+					step.polyline.decodePath().map { LatLng(it.lat, it.lng) }
+				}
+				steps = newSteps
+				stepPaths = newStepPaths
+				// linia trasy do narysowania = sklejone detaliczne odcinki krokow
+				currentNavRoute = newStepPaths.flatten()
 				currentStepIndex = 0
+				offRouteCount = 0
 				callback(this@GMapsNavController)
 			}
 		})
@@ -118,35 +117,34 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	/** Oblicza biezace dane prowadzenia na podstawie aktualnej pozycji auta */
 	fun updateGuidance(location: Location): NavigationGuidance? {
 		val steps = this.steps
-		if (steps.isEmpty()) return null
+		val stepPaths = this.stepPaths
+		if (steps.isEmpty() || stepPaths.size != steps.size) return null
 
-		// --- wykrywanie zjazdu z trasy -> automatyczne przeliczenie ---
-		val route = currentNavRoute
-		if (route != null && route.size >= 2) {
-			val offDist = distanceToPolylineMeters(location.latitude, location.longitude, route)
-			val now = System.currentTimeMillis()
-			if (offDist > OFFROUTE_THRESHOLD_M) {
-				offRouteCount += 1
-				if (offRouteCount >= 2 && now - lastRerouteTimeMs > REROUTE_MIN_INTERVAL_MS) {
-					lastRerouteTimeMs = now
-					offRouteCount = 0
-					Log.i(TAG, "Off route by ${offDist.toInt()} m, recalculating")
-					currentNavDestination?.let { navigateTo(it) }
-					return null   // nowa trasa w drodze; pomijamy te klatke prowadzenia
-				}
-			} else {
-				offRouteCount = 0
+		// --- dopasuj sie do najblizszego kroku OD biezacego w przod (snap do trasy) ---
+		var bestIdx = currentStepIndex
+		var bestDist = Double.MAX_VALUE
+		for (i in currentStepIndex until steps.size) {
+			val d = distanceToPolylineMeters(location.latitude, location.longitude, stepPaths[i])
+			if (d < bestDist) {
+				bestDist = d
+				bestIdx = i
 			}
 		}
+		currentStepIndex = bestIdx
 
-		if (currentStepIndex >= steps.size) return null
-
-		// jesli dojechalismy blisko konca biezacego kroku, przejdz do nastepnego
-		val curStep = steps[currentStepIndex]
-		val distToCurEnd = distanceMeters(location.latitude, location.longitude,
-				curStep.endLocation.lat, curStep.endLocation.lng)
-		if (distToCurEnd < 25.0 && currentStepIndex < steps.size - 1) {
-			currentStepIndex += 1
+		// --- wykrywanie zjazdu z trasy -> automatyczne przeliczenie ---
+		val now = System.currentTimeMillis()
+		if (bestDist > OFFROUTE_THRESHOLD_M) {
+			offRouteCount += 1
+			if (offRouteCount >= 2 && now - lastRerouteTimeMs > REROUTE_MIN_INTERVAL_MS) {
+				lastRerouteTimeMs = now
+				offRouteCount = 0
+				Log.i(TAG, "Off route by ${bestDist.toInt()} m, recalculating")
+				currentNavDestination?.let { navigateTo(it) }
+				return null   // nowa trasa w drodze; pomijamy te klatke prowadzenia
+			}
+		} else {
+			offRouteCount = 0
 		}
 
 		val step = steps[currentStepIndex]
@@ -165,55 +163,61 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		}
 		val eta = System.currentTimeMillis() + remainingSec * 1000L
 
-		val speedKmh = computeSpeedKmh(location)
-
 		@Suppress("DEPRECATION")
 		val instr = Html.fromHtml(step.htmlInstructions ?: "").toString()
 
+		// na rondzie: ikona ronda + numer zjazdu (np. "⟳③") zamiast zwyklej strzalki
+		val maneuver = step.maneuver
+		val arrow = if (maneuver != null && maneuver.contains("roundabout")) {
+			val exit = parseRoundaboutExit(instr)
+			if (exit != null) "\u21BB" + circledNumber(exit) else "\u21BB"
+		} else {
+			arrowFor(maneuver)
+		}
+
 		return NavigationGuidance(
-				maneuverArrow = arrowFor(step.maneuver),
+				maneuverArrow = arrow,
 				maneuverText = instr,
 				distanceToTurnMeters = distToTurn,
 				remainingDistanceMeters = remaining,
-				etaEpochMillis = eta,
-				speedKmh = speedKmh
+				etaEpochMillis = eta
 		)
-	}
-
-	/** Predkosc liczona z przesuniecia pozycji w czasie (odporna na smieciowe pole predkosci z CDS) */
-	private fun computeSpeedKmh(location: Location): Int {
-		val nowMs = System.currentTimeMillis()
-		val pLat = lastSpeedLat
-		val pLng = lastSpeedLng
-		if (pLat != null && pLng != null && lastSpeedTimeMs != 0L) {
-			val dt = (nowMs - lastSpeedTimeMs) / 1000.0
-			if (dt >= 0.5) {
-				val d = distanceMeters(pLat, pLng, location.latitude, location.longitude)
-				val kmh = (d / dt) * 3.6
-				if (kmh in 0.0..250.0) {
-					// filtr dolnoprzepustowy, zeby predkosc nie skakala
-					smoothedSpeedKmh = 0.6 * smoothedSpeedKmh + 0.4 * kmh
-				}
-				lastSpeedLat = location.latitude
-				lastSpeedLng = location.longitude
-				lastSpeedTimeMs = nowMs
-			}
-		} else {
-			lastSpeedLat = location.latitude
-			lastSpeedLng = location.longitude
-			lastSpeedTimeMs = nowMs
-		}
-		return smoothedSpeedKmh.toInt().coerceIn(0, 250)
 	}
 
 	private fun arrowFor(maneuver: String?): String {
 		val m = maneuver ?: return "\u2191"
 		return when {
 			m.contains("uturn") -> "\u27F2"
+			m.contains("roundabout") -> "\u21BB"
 			m.contains("left") -> "\u2190"
 			m.contains("right") -> "\u2192"
 			else -> "\u2191"
 		}
+	}
+
+	/** Wyciaga numer zjazdu z ronda z polskiej wskazowki (np. "Na rondzie trzeci zjazd ..." -> 3) */
+	private fun parseRoundaboutExit(instruction: String): Int? {
+		val lower = instruction.lowercase()
+		// forma cyfrowa: "3. zjazd" / "3 zjazd"
+		Regex("(\\d+)\\s*\\.?\\s*zjazd").find(lower)?.let {
+			return it.groupValues[1].toIntOrNull()
+		}
+		// forma slowna (z polskimi znakami i bez)
+		val words = mapOf(
+				"pierwszy" to 1, "drugi" to 2, "trzeci" to 3, "czwarty" to 4,
+				"piąty" to 5, "piaty" to 5, "szósty" to 6, "szosty" to 6,
+				"siódmy" to 7, "siodmy" to 7, "ósmy" to 8, "osmy" to 8,
+				"dziewiąty" to 9, "dziewiaty" to 9, "dziesiąty" to 10, "dziesiaty" to 10
+		)
+		for ((w, n) in words) {
+			if (lower.contains("$w zjazd")) return n
+		}
+		return null
+	}
+
+	/** Liczba w kolku: 1 -> ①, 3 -> ③ (Unicode U+2460..). Powyzej 20 zwraca zwykla cyfre. */
+	private fun circledNumber(n: Int): String {
+		return if (n in 1..20) ('\u2460' + (n - 1)).toString() else "$n"
 	}
 
 	private fun distanceMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
@@ -222,8 +226,10 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		return results[0].toDouble()
 	}
 
-	/** Najmniejsza odleglosc punktu od lamanej trasy (w metrach) */
+	/** Najmniejsza odleglosc punktu od lamanej (w metrach) */
 	private fun distanceToPolylineMeters(lat: Double, lng: Double, poly: List<LatLng>): Double {
+		if (poly.isEmpty()) return Double.MAX_VALUE
+		if (poly.size == 1) return distanceMeters(lat, lng, poly[0].latitude, poly[0].longitude)
 		var best = Double.MAX_VALUE
 		for (i in 0 until poly.size - 1) {
 			val d = distanceToSegmentMeters(lat, lng,
