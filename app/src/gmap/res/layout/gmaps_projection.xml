@@ -12,16 +12,15 @@
         android:layout_height="match_parent"
         map:mapType="normal" />
 
-    <!-- Panel prowadzenia z lewej strony (styl Google Maps) -->
+    <!-- Panel prowadzenia z lewej strony (styl Google Maps). Szerokosc i lewy margines
+         ustawiane sa w kodzie, zeby panel trzymal sie widocznego obszaru takze w trybie split. -->
     <LinearLayout
         android:id="@+id/navPanel"
-        android:layout_width="0dp"
+        android:layout_width="240dp"
         android:layout_height="0dp"
         android:orientation="vertical"
-        android:background="#E6202124"
+        android:background="#FF1B1B1D"
         android:visibility="gone"
-        app:layout_constraintWidth_percent="0.30"
-        app:layout_constraintWidth_default="percent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
@@ -66,7 +65,7 @@
                 tools:text="Skręć w prawo w ul. Główną" />
         </LinearLayout>
 
-        <!-- Blok informacji: ETA / pozostaly dystans / predkosc -->
+        <!-- Blok informacji: czas przyjazdu + pozostaly dystans -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -86,7 +85,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFF"
-                android:textSize="30sp"
+                android:textSize="32sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 tools:text="14:32" />
@@ -94,7 +93,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="16dp"
                 android:text="Pozostało"
                 android:textColor="#9AA0A6"
                 android:textSize="13sp" />
@@ -104,28 +103,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFF"
-                android:textSize="22sp"
+                android:textSize="24sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 tools:text="12,4 km" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="Prędkość"
-                android:textColor="#9AA0A6"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/navSpeed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"
-                tools:text="52 km/h" />
         </LinearLayout>
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
