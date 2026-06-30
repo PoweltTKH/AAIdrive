@@ -113,6 +113,14 @@ class GMapsController(private val context: Context,
 		// move the map dot to the new location
 		gMapLocationSource.onLocationUpdate(location)
 
+		// aktualizuj pasek prowadzenia turn-by-turn
+		if (navController.currentNavDestination != null) {
+			val guidance = navController.updateGuidance(location)
+			projection?.updateGuidance(guidance)
+		} else {
+			projection?.updateGuidance(null)
+		}
+
 		// check to re-apply day/night settings after an interval
 		if (lastSettingsTime + SETTINGS_TIME_INTERVAL < System.currentTimeMillis()) {
 			projection?.applySettings()
@@ -239,5 +247,6 @@ class GMapsController(private val context: Context,
 	override fun stopNavigation() {
 		// clear out previous nav
 		navController.stopNavigation()
+		projection?.updateGuidance(null)
 	}
 }
