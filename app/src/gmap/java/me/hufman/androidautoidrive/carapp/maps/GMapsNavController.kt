@@ -15,8 +15,10 @@ import com.google.maps.model.TravelMode
 import me.hufman.androidautoidrive.maps.CarLocationProvider
 import me.hufman.androidautoidrive.maps.LatLong
 import java.util.concurrent.TimeUnit
+import kotlin.math.cos
+import kotlin.math.sqrt
 
-/** Dane prowadzenia turn-by-turn pokazywane na pasku nawigacji */
+/** Dane prowadzenia turn-by-turn pokazywane na panelu nawigacji */
 data class NavigationGuidance(
 		val maneuverArrow: String,
 		val maneuverText: String,
@@ -30,6 +32,10 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	val TAG = "GMapsNavController"
 
 	companion object {
+		// zjazd z trasy: prog odleglosci od linii trasy i minimalny odstep miedzy przeliczeniami
+		private const val OFFROUTE_THRESHOLD_M = 70.0
+		private const val REROUTE_MIN_INTERVAL_MS = 12000L
+
 		fun getInstance(context: Context, locationProvider: CarLocationProvider, callback: (GMapsNavController) -> Unit): GMapsNavController {
 			val api_key = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
 					.metaData.getString("com.google.android.geo.API_KEY") ?: ""
@@ -51,6 +57,16 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	private var steps: List<DirectionsStep> = emptyList()
 	private var currentStepIndex: Int = 0
 
+	// liczenie predkosci z przesuniecia pozycji GPS (pole predkosci z auta bywa smieciowe)
+	private var lastSpeedLat: Double? = null
+	private var lastSpeedLng: Double? = null
+	private var lastSpeedTimeMs: Long = 0L
+	private var smoothedSpeedKmh: Double = 0.0
+
+	// wykrywanie zjazdu z trasy
+	private var offRouteCount: Int = 0
+	private var lastRerouteTimeMs: Long = 0L
+
 	fun navigateTo(dest: LatLong) {
 		currentNavDestination = dest
 
@@ -63,6 +79,7 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		currentNavRoute = null
 		steps = emptyList()
 		currentStepIndex = 0
+		offRouteCount = 0
 		callback(this)
 	}
 
@@ -102,6 +119,26 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	fun updateGuidance(location: Location): NavigationGuidance? {
 		val steps = this.steps
 		if (steps.isEmpty()) return null
+
+		// --- wykrywanie zjazdu z trasy -> automatyczne przeliczenie ---
+		val route = currentNavRoute
+		if (route != null && route.size >= 2) {
+			val offDist = distanceToPolylineMeters(location.latitude, location.longitude, route)
+			val now = System.currentTimeMillis()
+			if (offDist > OFFROUTE_THRESHOLD_M) {
+				offRouteCount += 1
+				if (offRouteCount >= 2 && now - lastRerouteTimeMs > REROUTE_MIN_INTERVAL_MS) {
+					lastRerouteTimeMs = now
+					offRouteCount = 0
+					Log.i(TAG, "Off route by ${offDist.toInt()} m, recalculating")
+					currentNavDestination?.let { navigateTo(it) }
+					return null   // nowa trasa w drodze; pomijamy te klatke prowadzenia
+				}
+			} else {
+				offRouteCount = 0
+			}
+		}
+
 		if (currentStepIndex >= steps.size) return null
 
 		// jesli dojechalismy blisko konca biezacego kroku, przejdz do nastepnego
@@ -127,7 +164,9 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 			remainingSec += steps[i].duration.inSeconds
 		}
 		val eta = System.currentTimeMillis() + remainingSec * 1000L
-		val speedKmh = (location.speed * 3.6f).toInt().coerceAtLeast(0)
+
+		val speedKmh = computeSpeedKmh(location)
+
 		@Suppress("DEPRECATION")
 		val instr = Html.fromHtml(step.htmlInstructions ?: "").toString()
 
@@ -139,6 +178,32 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				etaEpochMillis = eta,
 				speedKmh = speedKmh
 		)
+	}
+
+	/** Predkosc liczona z przesuniecia pozycji w czasie (odporna na smieciowe pole predkosci z CDS) */
+	private fun computeSpeedKmh(location: Location): Int {
+		val nowMs = System.currentTimeMillis()
+		val pLat = lastSpeedLat
+		val pLng = lastSpeedLng
+		if (pLat != null && pLng != null && lastSpeedTimeMs != 0L) {
+			val dt = (nowMs - lastSpeedTimeMs) / 1000.0
+			if (dt >= 0.5) {
+				val d = distanceMeters(pLat, pLng, location.latitude, location.longitude)
+				val kmh = (d / dt) * 3.6
+				if (kmh in 0.0..250.0) {
+					// filtr dolnoprzepustowy, zeby predkosc nie skakala
+					smoothedSpeedKmh = 0.6 * smoothedSpeedKmh + 0.4 * kmh
+				}
+				lastSpeedLat = location.latitude
+				lastSpeedLng = location.longitude
+				lastSpeedTimeMs = nowMs
+			}
+		} else {
+			lastSpeedLat = location.latitude
+			lastSpeedLng = location.longitude
+			lastSpeedTimeMs = nowMs
+		}
+		return smoothedSpeedKmh.toInt().coerceIn(0, 250)
 	}
 
 	private fun arrowFor(maneuver: String?): String {
@@ -155,5 +220,36 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		val results = FloatArray(1)
 		Location.distanceBetween(lat1, lng1, lat2, lng2, results)
 		return results[0].toDouble()
+	}
+
+	/** Najmniejsza odleglosc punktu od lamanej trasy (w metrach) */
+	private fun distanceToPolylineMeters(lat: Double, lng: Double, poly: List<LatLng>): Double {
+		var best = Double.MAX_VALUE
+		for (i in 0 until poly.size - 1) {
+			val d = distanceToSegmentMeters(lat, lng,
+					poly[i].latitude, poly[i].longitude,
+					poly[i + 1].latitude, poly[i + 1].longitude)
+			if (d < best) best = d
+		}
+		return best
+	}
+
+	/** Odleglosc punktu P od odcinka A-B, lokalna aproksymacja rownopowierzchniowa w metrach */
+	private fun distanceToSegmentMeters(plat: Double, plng: Double,
+	                                    alat: Double, alng: Double,
+	                                    blat: Double, blng: Double): Double {
+		val mPerDegLat = 111320.0
+		val mPerDegLng = 111320.0 * cos(Math.toRadians(plat))
+		val ax = (alng - plng) * mPerDegLng
+		val ay = (alat - plat) * mPerDegLat
+		val bx = (blng - plng) * mPerDegLng
+		val by = (blat - plat) * mPerDegLat
+		val dx = bx - ax
+		val dy = by - ay
+		val len2 = dx * dx + dy * dy
+		val t = if (len2 <= 0.0) 0.0 else (((0.0 - ax) * dx + (0.0 - ay) * dy) / len2).coerceIn(0.0, 1.0)
+		val cx = ax + t * dx
+		val cy = ay + t * dy
+		return sqrt(cx * cx + cy * cy)
 	}
 }
