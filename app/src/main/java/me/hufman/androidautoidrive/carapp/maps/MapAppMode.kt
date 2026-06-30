@@ -34,7 +34,7 @@ class DynamicScreenCaptureConfig(val fullDimensions: RHMIDimensions,
 			return if (carTransport == MusicAppMode.TRANSPORT_PORTS.USB) {
 				if (recentInteraction) 40 else 65
 			} else {
-				if (recentInteraction) 12 else 40
+				if (recentInteraction) 25 else 55
 			}
 		}
 
