@@ -17,6 +17,10 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 	var isRunning = true
 	private var handler: Handler? = null
 
+	// tlumienie identycznych klatek (np. gdy auto stoi) - nie wysylamy tej samej klatki ponownie
+	private var lastSentHash = 0
+	private var lastSentLen = -1
+
 	fun start(handler: Handler) {
 		this.handler = handler
 		Log.i(TAG, "Starting FrameUpdater thread with handler $handler")
@@ -54,6 +58,7 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 		this.destination = destination
 		Log.i(TAG, "Changing map mode to $width x $height")
 		display.changeImageSize(width, height)
+		lastSentLen = -1   // wymus ponowne wyslanie po zmianie okna/rozmiaru
 		modeListener?.onResume()
 	}
 	fun hideWindow(destination: RHMIModel) {
@@ -65,6 +70,13 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 
 	private fun sendImage(bitmap: Bitmap) {
 		val imageData = display.compressBitmap(bitmap)
+		// jesli klatka jest identyczna jak poprzednio wyslana, pomijamy ja (oszczedza pasmo w bezruchu)
+		val hash = imageData.contentHashCode()
+		if (imageData.size == lastSentLen && hash == lastSentHash) {
+			return
+		}
+		lastSentLen = imageData.size
+		lastSentHash = hash
 		try {
 			val destination = this.destination
 			if (destination is RHMIModel.RaImageModel) {
