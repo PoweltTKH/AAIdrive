@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Display
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.TextView
 import com.google.android.gms.maps.GoogleMap
@@ -35,7 +36,6 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private var navDistance: TextView? = null
 	private var navEta: TextView? = null
 	private var navRemaining: TextView? = null
-	private var navSpeed: TextView? = null
 
 	val fullDimensions = display.run {
 		val small = Point()
@@ -64,7 +64,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		navDistance = findViewById(R.id.navDistance)
 		navEta = findViewById(R.id.navEta)
 		navRemaining = findViewById(R.id.navRemaining)
-		navSpeed = findViewById(R.id.navSpeed)
+		layoutNavPanel()
 
 		val gmapView = findViewById<MapView>(R.id.gmapView)
 		gmapView.onCreate(savedInstanceState)
@@ -88,6 +88,18 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		}
 	}
 
+	/** Dopasowuje panel do widocznego obszaru mapy (w trybie split mapa jest wezsza i wycentrowana) */
+	private fun layoutNavPanel() {
+		val panel = navPanel ?: return
+		val margin = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
+		val lp = panel.layoutParams
+		if (lp is ViewGroup.MarginLayoutParams) {
+			lp.leftMargin = margin
+			lp.width = (sidebarDimensions.appWidth * 0.30).toInt()
+			panel.layoutParams = lp
+		}
+	}
+
 	/** Aktualizuje panel prowadzenia; null = ukryj (brak nawigacji) */
 	fun updateGuidance(g: NavigationGuidance?) {
 		if (g == null) {
@@ -100,7 +112,6 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		navDistance?.text = formatDistance(g.distanceToTurnMeters)
 		navRemaining?.text = formatDistance(g.remainingDistanceMeters)
 		navEta?.text = formatEta(g.etaEpochMillis)
-		navSpeed?.text = "${g.speedKmh} km/h"
 	}
 
 	private fun formatDistance(m: Double): String {
@@ -129,6 +140,8 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		// so update the map's margin to match
 		val margin = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
 		map?.setPadding(margin, 0, margin, 0)
+		// panel tez musi sie dopasowac do biezacego trybu (full/split)
+		layoutNavPanel()
 
 		val style = appSettings[AppSettings.KEYS.GMAPS_STYLE].lowercase(Locale.ROOT)
 
