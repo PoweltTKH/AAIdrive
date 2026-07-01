@@ -36,11 +36,25 @@ jobs:
 
       - name: Staly klucz debug (umozliwia Aktualizuj bez odinstalowania)
         run: |
-          mkdir -p ~/.android
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > ~/.android/debug.keystore
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > /tmp/debug.keystore
+          # zapisz w lokalizacjach, ktorych moze szukac AGP dla domyslnego podpisu debug
+          mkdir -p "$HOME/.android" && cp /tmp/debug.keystore "$HOME/.android/debug.keystore"
+          if [ -n "$ANDROID_SDK_HOME" ]; then mkdir -p "$ANDROID_SDK_HOME/.android" && cp /tmp/debug.keystore "$ANDROID_SDK_HOME/.android/debug.keystore"; fi
+          echo "Zapisano debug.keystore. Oczekiwany odcisk SHA-1:"
+          keytool -list -v -keystore /tmp/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null | grep -i "SHA1:" || true
 
       - name: Build flavor Google Maps + Spotify (APK debug)
         run: ./gradlew assembleGmapNonalyticsFullDebug --stacktrace
+
+      - name: Weryfikacja PRAWDZIWEGO podpisu zbudowanego APK
+        run: |
+          APK=$(find app/build/outputs/apk/gmapNonalyticsFull/debug -name '*.apk' | head -1)
+          echo "APK: $APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort -V | tail -1)
+          echo "=== apksigner (SHA-1 podpisu APK) ==="
+          "$APKSIGNER" verify --print-certs "$APK" 2>/dev/null | grep -i "SHA-1" || true
+          echo "=== keytool fallback ==="
+          keytool -printcert -jarfile "$APK" 2>/dev/null | grep -i "SHA1" || true
 
       - name: Wrzucenie APK do artefaktow builda
         uses: actions/upload-artifact@v4
