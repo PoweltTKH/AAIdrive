@@ -69,7 +69,9 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 	}
 
 	private fun sendImage(bitmap: Bitmap) {
+		val compressStart = System.nanoTime()   // PERF: pomiar czasu kompresji
 		val imageData = display.compressBitmap(bitmap)
+		val compressMs = (System.nanoTime() - compressStart) / 1_000_000.0   // PERF
 		// jesli klatka jest identyczna jak poprzednio wyslana, pomijamy ja (oszczedza pasmo w bezruchu)
 		val hash = imageData.contentHashCode()
 		if (imageData.size == lastSentLen && hash == lastSentHash) {
@@ -77,6 +79,7 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 		}
 		lastSentLen = imageData.size
 		lastSentHash = hash
+		val sendStart = System.nanoTime()   // PERF: poczatek synchronicznego rhmi_setData
 		try {
 			val destination = this.destination
 			if (destination is RHMIModel.RaImageModel) {
@@ -90,5 +93,8 @@ class FrameUpdater(val display: VirtualDisplayScreenCapture, val modeListener: F
 		} catch (e: org.apache.etch.util.TimeoutException) {
 			// don't crash if the phone is unplugged during a frame update
 		}
+		// PERF: round-trip = czas trwania blokujacego setData (begin -> ack z auta)
+		val roundtripMs = (System.nanoTime() - sendStart) / 1_000_000.0
+		MapFramePerfLog.record(imageData.size, compressMs, roundtripMs)
 	}
 }

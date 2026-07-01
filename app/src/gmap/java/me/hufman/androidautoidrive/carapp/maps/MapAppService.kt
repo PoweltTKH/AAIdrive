@@ -27,6 +27,7 @@ class MapAppService: CarAppService() {
 
 	override fun onCarStart() {
 		Log.i(MainService.TAG, "Starting GMaps")
+		MapFramePerfLog.init(applicationContext)   // PERF: instrumentacja pipeline'u klatek (wyl. flaga PERF_LOG)
 		val cdsData = CDSDataProvider()
 		cdsData.setConnection(CarInformation.cdsData.asConnection(cdsData))
 		val carLocationProvider = CdsLocationProvider(cdsData, false)
