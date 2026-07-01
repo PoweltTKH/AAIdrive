@@ -78,6 +78,7 @@ android {
 
     signingConfigs {
         release
+        debug
     }
     if (isRunningOnCI) {
         // configure keystore
@@ -85,6 +86,11 @@ android {
         signingConfigs.release.storePassword = System.getenv("KEYSTORE_PASSWORD")
         signingConfigs.release.keyAlias = System.getenv("KEYSTORE_ALIAS")
         signingConfigs.release.keyPassword = System.getenv("KEYSTORE_ALIAS_PASSWORD")
+        // staly klucz debug: spojny odcisk SHA-1 (Spotify App Remote) i instalacja przez "Aktualizuj"
+        signingConfigs.debug.storeFile = file("../debug.keystore")
+        signingConfigs.debug.storePassword = "android"
+        signingConfigs.debug.keyAlias = "androiddebugkey"
+        signingConfigs.debug.keyPassword = "android"
     }
 
     sourceSets {
@@ -125,6 +131,7 @@ android {
             pseudoLocalesEnabled true
             enableUnitTestCoverage false
             enableAndroidTestCoverage false
+            signingConfig signingConfigs.debug
         }
     }
     bundle {
