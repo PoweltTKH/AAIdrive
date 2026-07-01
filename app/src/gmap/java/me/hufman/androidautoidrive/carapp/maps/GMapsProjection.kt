@@ -3,8 +3,17 @@ package me.hufman.androidautoidrive.carapp.maps
 import android.annotation.SuppressLint
 import android.app.Presentation
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Point
+import android.graphics.drawable.BitmapDrawable
+import android.location.Location
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ImageSpan
 import android.util.Log
 import android.view.Display
 import android.view.View
@@ -15,7 +24,12 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.OnMapsSdkInitializedCallback
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import io.bimmergestalt.idriveconnectkit.SidebarRHMIDimensions
 import io.bimmergestalt.idriveconnectkit.SubsetRHMIDimensions
 import me.hufman.androidautoidrive.*
@@ -37,6 +51,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private var navEta: TextView? = null
 	private var navRemaining: TextView? = null
 
+	// wlasny znacznik pozycji (grot obracany wg location.bearing) zamiast wbudowanej kropki
+	private var locationPuck: Marker? = null
+	private var puckIcon: BitmapDescriptor? = null
+
 	val fullDimensions = display.run {
 		val small = Point()
 		val dimension = Point()
@@ -46,6 +64,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	val sidebarDimensions = SidebarRHMIDimensions(fullDimensions) {
 		appSettings[AppSettings.KEYS.MAP_WIDESCREEN].toBoolean()
 	}
+
+	// szerokosc panelu prowadzenia w px - jedno zrodlo dla layoutu panelu i dla paddingu mapy
+	private val panelWidthPx: Int
+		get() = (sidebarDimensions.appWidth * 0.30).toInt()
 
 	@SuppressLint("MissingPermission")
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,7 +97,8 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			applySettings()
 
 			map.setLocationSource(locationSource)
-			map.isMyLocationEnabled = true
+			// wbudowana kropka wylaczona - rysujemy wlasny grot obracany wg kursu (updateLocationPuck)
+			map.isMyLocationEnabled = false
 
 			map.isIndoorEnabled = false
 
@@ -95,7 +118,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		val lp = panel.layoutParams
 		if (lp is ViewGroup.MarginLayoutParams) {
 			lp.leftMargin = margin
-			lp.width = (sidebarDimensions.appWidth * 0.30).toInt()
+			lp.width = panelWidthPx
 			panel.layoutParams = lp
 		}
 	}
@@ -107,7 +130,8 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			return
 		}
 		navPanel?.visibility = View.VISIBLE
-		navArrow?.text = g.maneuverArrow
+		// rondo: rysowana ikona znaku (pierscien + strzalka zjazdu) + numer zjazdu; reszta: glif tekstowy
+		navArrow?.text = if (g.isRoundabout) buildRoundaboutLabel(g.roundaboutExit) else g.maneuverArrow
 		navInstruction?.text = g.maneuverText
 		navDistance?.text = formatDistance(g.distanceToTurnMeters)
 		navRemaining?.text = formatDistance(g.remainingDistanceMeters)
@@ -122,6 +146,83 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private fun formatEta(epochMillis: Long): String {
 		val sdf = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
 		return sdf.format(Date(epochMillis))
+	}
+
+	/** Aktualizuje wlasny grot pozycji: pozycja + obrot wg kursu. Mapa zostaje north-up, obraca sie sam sprite. */
+	fun updateLocationPuck(location: Location) {
+		val map = this.map ?: return
+		val pos = LatLng(location.latitude, location.longitude)
+		val rot = if (location.hasBearing()) location.bearing else (locationPuck?.rotation ?: 0f)
+		val puck = locationPuck
+		if (puck == null) {
+			val icon = puckIcon ?: buildLocationPuck().also { puckIcon = it }
+			locationPuck = map.addMarker(MarkerOptions()
+					.position(pos)
+					.icon(icon)
+					.anchor(0.5f, 0.5f)   // obrot wokol srodka
+					.flat(true)           // lezy na mapie -> rotation == kurs geograficzny
+					.rotation(rot)
+					.zIndex(1000f))
+		} else {
+			puck.position = pos
+			puck.rotation = rot
+		}
+	}
+
+	/** Po map.clear() marker jest juz usuniety - kasujemy referencje, by przy nastepnym fixie odtworzyc grot. */
+	fun resetLocationPuck() {
+		locationPuck = null
+	}
+
+	/** Kompaktowy grot nawigacyjny (nieco wiekszy niz kropka): niebieskie wypelnienie + bialy obrys, czubek na polnoc. */
+	private fun buildLocationPuck(): BitmapDescriptor {
+		val s = 56
+		val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+		val c = Canvas(bmp)
+		val w = s.toFloat(); val h = s.toFloat()
+		val path = Path().apply {
+			moveTo(w / 2f, h * 0.10f)      // czubek (polnoc)
+			lineTo(w * 0.82f, h * 0.90f)   // prawy dol
+			lineTo(w / 2f, h * 0.70f)      // wciecie
+			lineTo(w * 0.18f, h * 0.90f)   // lewy dol
+			close()
+		}
+		val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1A73E8.toInt(); style = Paint.Style.FILL }
+		val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.07f; strokeJoin = Paint.Join.ROUND
+		}
+		c.drawPath(path, fill)
+		c.drawPath(path, edge)
+		return BitmapDescriptorFactory.fromBitmap(bmp)
+	}
+
+	/** Etykieta ronda: rysowana ikona znaku drogowego (pierscien + strzalka zjazdu) + numer zjazdu. */
+	private fun buildRoundaboutLabel(exit: Int?): CharSequence {
+		val sizePx = (navArrow?.textSize ?: 44f).toInt().coerceAtLeast(24)
+		val sb = SpannableStringBuilder(" ")
+		sb.setSpan(ImageSpan(roundaboutIcon(sizePx), ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+		if (exit != null) sb.append("  $exit")
+		return sb
+	}
+
+	/** Ikona ronda w stylu znaku: pierscien, wlot od dolu, strzalka zjazdu w prawo-gore. */
+	private fun roundaboutIcon(s: Int): BitmapDrawable {
+		val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+		val c = Canvas(bmp)
+		val cx = s / 2f; val cy = s * 0.45f; val r = s * 0.26f
+		val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.08f
+			strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+		}
+		c.drawCircle(cx, cy, r, p)                        // pierscien ronda
+		c.drawLine(cx, s * 0.98f, cx, cy + r, p)          // wlot od dolu
+		val ex = cx + r * 1.15f; val ey = cy - r * 1.15f  // zjazd w prawo-gore
+		c.drawLine(cx + r * 0.35f, cy - r * 0.35f, ex, ey, p)
+		val head = Path().apply {                         // grot zjazdu
+			moveTo(ex - s * 0.14f, ey + s * 0.02f); lineTo(ex, ey); lineTo(ex - s * 0.02f, ey + s * 0.14f)
+		}
+		c.drawPath(head, p)
+		return BitmapDrawable(resources, bmp).apply { setBounds(0, 0, s, s) }
 	}
 
 	override fun onStart() {
@@ -139,7 +240,9 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
 		val margin = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
-		map?.setPadding(margin, 0, margin, 0)
+		// lewy padding = margines splitu + szerokosc panelu, zeby pozycja centrowala sie
+		// w widocznym obszarze NA PRAWO od panelu, nie w srodku calego obrazu
+		map?.setPadding(margin + panelWidthPx, 0, margin, 0)
 		// panel tez musi sie dopasowac do biezacego trybu (full/split)
 		layoutNavPanel()
 

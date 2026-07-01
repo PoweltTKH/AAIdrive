@@ -24,7 +24,9 @@ data class NavigationGuidance(
 		val maneuverText: String,
 		val distanceToTurnMeters: Double,
 		val remainingDistanceMeters: Double,
-		val etaEpochMillis: Long
+		val etaEpochMillis: Long,
+		val isRoundabout: Boolean = false,
+		val roundaboutExit: Int? = null
 )
 
 class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: CarLocationProvider, var callback: (GMapsNavController) -> Unit) {
@@ -170,6 +172,8 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		val upcomingIdx = currentStepIndex + 1
 		val arrow: String
 		val instr: String
+		var isRoundabout = false
+		var roundaboutExit: Int? = null
 		if (upcomingIdx < steps.size) {
 			val next = steps[upcomingIdx]
 			@Suppress("DEPRECATION")
@@ -177,6 +181,8 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 			val maneuver = next.maneuver
 			arrow = if (maneuver != null && maneuver.contains("roundabout")) {
 				val exit = parseRoundaboutExit(nextInstr)
+				isRoundabout = true
+				roundaboutExit = exit
 				if (exit != null) "\u21BB" + circledNumber(exit) else "\u21BB"
 			} else {
 				arrowFor(maneuver)
@@ -193,7 +199,9 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				maneuverText = instr,
 				distanceToTurnMeters = distToTurn,
 				remainingDistanceMeters = remaining,
-				etaEpochMillis = eta
+				etaEpochMillis = eta,
+				isRoundabout = isRoundabout,
+				roundaboutExit = roundaboutExit
 		)
 	}
 

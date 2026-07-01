@@ -117,6 +117,9 @@ class GMapsController(private val context: Context,
 		// move the map dot to the new location
 		gMapLocationSource.onLocationUpdate(location)
 
+		// wlasny grot pozycji obracany wg kursu (mapa north-up)
+		projection?.updateLocationPuck(location)
+
 		// aktualizuj panel prowadzenia turn-by-turn (throttlowany do ~1/s)
 		if (navController.currentNavDestination != null) {
 			val guidance = navController.updateGuidance(location)
@@ -179,6 +182,7 @@ class GMapsController(private val context: Context,
 		mapAppMode.startInteraction(NAVIGATION_MAP_STARTZOOM_TIME + 4000)
 		// clear out previous nav
 		projection?.map?.clear()
+		projection?.resetLocationPuck()
 		// show new nav destination icon
 		navController.navigateTo(dest)
 
@@ -220,6 +224,7 @@ class GMapsController(private val context: Context,
 			val map = projection?.map
 			if (map != null) {
 				map.clear()
+				projection?.resetLocationPuck()   // clear() usunal grot - odtworzymy go nizej
 
 				// destination flag
 				val dest = navController.currentNavDestination
@@ -237,6 +242,9 @@ class GMapsController(private val context: Context,
 				if (currentNavRoute != null) {
 					map.addPolyline(PolylineOptions().color(context.getColor(R.color.mapRouteLine)).addAll(currentNavRoute))
 				}
+
+				// odtworz grot pozycji po map.clear()
+				currentLocation?.let { projection?.updateLocationPuck(it) }
 			}
 		}
 		if (Looper.myLooper() != handler.looper) {

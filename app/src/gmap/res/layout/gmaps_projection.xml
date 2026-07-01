@@ -65,13 +65,18 @@
                 tools:text="Skręć w prawo w ul. Główną" />
         </LinearLayout>
 
-        <!-- Blok informacji: czas przyjazdu + pozostaly dystans -->
+        <!-- Blok informacji: czas przyjazdu + pozostaly dystans.
+             paddingTop podniesiony, by "Przyjazd"/ETA zeszly PONIZEJ pasa natywnej
+             pomaranczowej strzalki BMW (kolizja tylko z tymi wierszami; "Pozostalo" bylo juz czyste). -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="14dp"
+            android:paddingTop="64dp">
 
             <TextView
                 android:layout_width="wrap_content"

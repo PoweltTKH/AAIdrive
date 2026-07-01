@@ -17,8 +17,7 @@ class GMapsLocationSource: LocationSource {
 	}
 
 	fun onLocationUpdate(location: Location) {
-		listener ?: return
-
+		// zapisujemy pozycje ZAWSZE (uzywana do day/night), niezaleznie od aktywnej warstwy my-location
 		this.location = location
 		listener?.onLocationChanged(location)
 	}
