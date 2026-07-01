@@ -1,3 +1,8 @@
+# =====================================================================
+#  AAIdrive – build wersji Google Maps + Spotify (flavor "gmap")
+#  WERSJA 3 – Spotify wlaczone (Client ID z sekretu)
+# =====================================================================
+
 name: build-gmap
 
 on:
@@ -28,6 +33,11 @@ jobs:
 
       - name: Pobranie zaleznosci (certyfikaty BMW Connected)
         uses: ./.github/actions/download-externals-action
+
+      - name: Staly klucz debug (umozliwia Aktualizuj bez odinstalowania)
+        run: |
+          mkdir -p ~/.android
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > ~/.android/debug.keystore
 
       - name: Build flavor Google Maps + Spotify (APK debug)
         run: ./gradlew assembleGmapNonalyticsFullDebug --stacktrace
