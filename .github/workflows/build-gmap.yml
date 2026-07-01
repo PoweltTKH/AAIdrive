@@ -34,14 +34,11 @@ jobs:
       - name: Pobranie zaleznosci (certyfikaty BMW Connected)
         uses: ./.github/actions/download-externals-action
 
-      - name: Staly klucz debug (umozliwia Aktualizuj bez odinstalowania)
+      - name: Staly klucz debug (spojny podpis dla Spotify + Aktualizuj)
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > /tmp/debug.keystore
-          # zapisz w lokalizacjach, ktorych moze szukac AGP dla domyslnego podpisu debug
-          mkdir -p "$HOME/.android" && cp /tmp/debug.keystore "$HOME/.android/debug.keystore"
-          if [ -n "$ANDROID_SDK_HOME" ]; then mkdir -p "$ANDROID_SDK_HOME/.android" && cp /tmp/debug.keystore "$ANDROID_SDK_HOME/.android/debug.keystore"; fi
-          echo "Zapisano debug.keystore. Oczekiwany odcisk SHA-1:"
-          keytool -list -v -keystore /tmp/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null | grep -i "SHA1:" || true
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/debug.keystore"
+          echo "Zapisano $GITHUB_WORKSPACE/debug.keystore. Oczekiwany SHA-1:"
+          keytool -list -v -keystore "$GITHUB_WORKSPACE/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | grep -i "SHA1:" || true
 
       - name: Build flavor Google Maps + Spotify (APK debug)
         run: ./gradlew assembleGmapNonalyticsFullDebug --stacktrace
