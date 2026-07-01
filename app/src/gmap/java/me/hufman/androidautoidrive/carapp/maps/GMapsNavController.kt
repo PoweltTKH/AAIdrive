@@ -147,32 +147,45 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 			offRouteCount = 0
 		}
 
-		val step = steps[currentStepIndex]
+		val curStep = steps[currentStepIndex]
+		// nastepny manewr wykonuje sie na KONCU biezacego kroku (== poczatek nastepnego kroku)
 		val distToTurn = distanceMeters(location.latitude, location.longitude,
-				step.endLocation.lat, step.endLocation.lng)
+				curStep.endLocation.lat, curStep.endLocation.lng)
 
-		// pozostaly dystans = do najblizszego zakretu + suma kolejnych krokow
+		// pozostaly dystans do celu = do konca biezacego kroku + suma kolejnych krokow
 		var remaining = distToTurn
 		for (i in (currentStepIndex + 1) until steps.size) {
 			remaining += steps[i].distance.inMeters.toDouble()
 		}
-		// pozostaly czas = suma czasow biezacego i kolejnych krokow
+		// pozostaly czas do celu
 		var remainingSec = 0L
 		for (i in currentStepIndex until steps.size) {
 			remainingSec += steps[i].duration.inSeconds
 		}
 		val eta = System.currentTimeMillis() + remainingSec * 1000L
 
-		@Suppress("DEPRECATION")
-		val instr = Html.fromHtml(step.htmlInstructions ?: "").toString()
-
-		// na rondzie: ikona ronda + numer zjazdu (np. "⟳③") zamiast zwyklej strzalki
-		val maneuver = step.maneuver
-		val arrow = if (maneuver != null && maneuver.contains("roundabout")) {
-			val exit = parseRoundaboutExit(instr)
-			if (exit != null) "\u21BB" + circledNumber(exit) else "\u21BB"
+		// WAZNE: pokazujemy NADCHODZACY manewr (z nastepnego kroku), nie ten juz wykonany.
+		// W danych Google instrukcja opisuje manewr na POCZATKU kroku, wiec nastepny zakret
+		// to instrukcja kroku (currentStepIndex + 1), a odleglosc do niego = do konca biezacego.
+		val upcomingIdx = currentStepIndex + 1
+		val arrow: String
+		val instr: String
+		if (upcomingIdx < steps.size) {
+			val next = steps[upcomingIdx]
+			@Suppress("DEPRECATION")
+			val nextInstr = Html.fromHtml(next.htmlInstructions ?: "").toString()
+			val maneuver = next.maneuver
+			arrow = if (maneuver != null && maneuver.contains("roundabout")) {
+				val exit = parseRoundaboutExit(nextInstr)
+				if (exit != null) "\u21BB" + circledNumber(exit) else "\u21BB"
+			} else {
+				arrowFor(maneuver)
+			}
+			instr = nextInstr
 		} else {
-			arrowFor(maneuver)
+			// biezacy krok jest ostatni -> dojazd do celu
+			arrow = "\u25C9"
+			instr = "Cel podróży"
 		}
 
 		return NavigationGuidance(
