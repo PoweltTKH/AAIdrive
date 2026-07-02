@@ -110,39 +110,37 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		carConnection.rhmi_addActionEventHandler(rhmiHandle, "me.hufman.androidautoidrive.mapview", -1)
 		carConnection.rhmi_addHmiEventHandler(rhmiHandle, "me.hufman.androidautoidrive.mapview", -1, -1)
 
-		// EKSPERYMENT native panel: pokaz nieuzywane komponenty stanu mapy (image 134 + 3x label)
-		// rownolegle z dzisiejszym panelem w bitmapie; patrz NativePanelTest
-		if (NativePanelTest.NATIVE_PANEL_TEST) {
-			initNativePanelTest()
+		// natywny panel prowadzenia w lewym pasie (image 134 + labelka dystansu); patrz NativePanel
+		if (NativePanel.ENABLED) {
+			initNativePanel()
 		}
 	}
 
-	/** Znajduje ukryte komponenty stanu pelnoekranowej mapy i ustawia je jako testowy natywny panel */
-	private fun initNativePanelTest() {
+	/** Ustawia natywne komponenty stanu mapy jako panel prowadzenia w lewym pasie */
+	private fun initNativePanel() {
 		// stan 19: image(132 mapa), list(133 scroll), image(134 wolny), label(135,136,137 wolne)
 		val extraImage = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Image>().drop(1).firstOrNull()
 		val labels = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Label>()
-		// NAKLADKA POROWNAWCZA (nie stan docelowy): natywne komponenty pozycjonowane w lewym
-		// pasie DOKLADNIE tam, gdzie docelowo ma byc panel - naloza sie na dzisiejszy panel
-		// z bitmapy, zeby ocenic font/pozycje/ucinanie natywnych w ich prawdziwym miejscu.
-		// Docelowo panel z bitmapy zniknie (przyciecie capture), a native zajmie jego miejsce.
-		Log.i(TAG, "NativePanelTest: NAKLADKA porownawcza w lewym pasie; extraImage=${extraImage?.id} labels=${labels.map { it.id }}")
+		Log.i(TAG, "NativePanel: extraImage=${extraImage?.id} labels=${labels.map { it.id }}")
 		if (extraImage == null && labels.isEmpty()) {
-			Log.w(TAG, "NativePanelTest: stan mapy nie ma wolnych komponentow - eksperyment niemozliwy")
+			Log.w(TAG, "NativePanel: stan mapy nie ma wolnych komponentow - panel natywny niedostepny")
 			return
 		}
 
-		// uklad docelowego panelu: ikona manewru u gory, pod nia instrukcja, ETA, dystans
-		extraImage?.setProperty(RHMIProperty.PropertyId.POSITION_X.id, 10)
-		extraImage?.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 10)
-		extraImage?.setProperty(RHMIProperty.PropertyId.WIDTH.id, 120)
-		extraImage?.setProperty(RHMIProperty.PropertyId.HEIGHT.id, 120)
-		extraImage?.setVisible(true)
-		labels.forEachIndexed { i, label ->
-			label.setProperty(RHMIProperty.PropertyId.POSITION_X.id, 10)
-			label.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 150 + i * 60)
-			label.setEnabled(true)
-			label.setVisible(true)
+		// dystans do manewru: natywna labelka u gory pasa (pod tytulem stanu); tyka ~1/s
+		labels.getOrNull(0)?.apply {
+			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 10)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 56)
+			setEnabled(true)
+			setVisible(true)
+		}
+		// reszta panelu (zielony blok + Przyjazd/Pozostalo) jako PNG w naszym stylu, ponizej dystansu
+		extraImage?.apply {
+			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 0)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 120)
+			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
+			setProperty(RHMIProperty.PropertyId.HEIGHT.id, 360)
+			setVisible(true)
 		}
 	}
 
@@ -150,23 +148,22 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		Log.i(TAG, "Setting up map transfer")
 		frameUpdater.start(handler)
 
-		// EKSPERYMENT native panel: zapisy modeli RHMI na watku car (male setData ~1/s)
-		if (NativePanelTest.NATIVE_PANEL_TEST) {
+		// natywny panel: zapisy modeli RHMI na watku car (deduplikowana labelka + rzadki PNG)
+		if (NativePanel.ENABLED) {
 			val labels = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Label>()
 			val extraImage = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Image>().drop(1).firstOrNull()
-			NativePanelTest.attach(handler) { iconPng, line1, line2, line3 ->
-				if (iconPng != null) {
-					(extraImage?.getModel() as? RHMIModel.RaImageModel)?.value = iconPng
-				}
-				labels.getOrNull(0)?.getModel()?.asRaDataModel()?.value = line1
-				labels.getOrNull(1)?.getModel()?.asRaDataModel()?.value = line2
-				labels.getOrNull(2)?.getModel()?.asRaDataModel()?.value = line3
-			}
+			NativePanel.attach(handler,
+					distanceSink = { distance ->
+						labels.getOrNull(0)?.getModel()?.asRaDataModel()?.value = distance
+					},
+					imageSink = { png ->
+						(extraImage?.getModel() as? RHMIModel.RaImageModel)?.value = png
+					})
 		}
 	}
 	fun onDestroy() {
-		if (NativePanelTest.NATIVE_PANEL_TEST) {
-			NativePanelTest.detach()
+		if (NativePanel.ENABLED) {
+			NativePanel.detach()
 		}
 		frameUpdater.shutDown()
 		mapAppMode.appSettings.callback = null

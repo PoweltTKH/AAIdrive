@@ -69,13 +69,12 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		get() = (sidebarDimensions.appWidth * 0.30).toInt()
 
 	/** Lewy margines widocznego obszaru na wirtualnym ekranie.
-	 *  Plan B natywnego panelu: komponent obrazu w aucie jest zwezony o pas natywny i przesuniety
-	 *  w prawo, wiec region przechwytywania (wezszy aspekt) zaczyna sie dalej od lewej -
-	 *  margines rosnie o polowe szerokosci pasa, by panel w bitmapie pozostal w kadrze. */
+	 *  Przy natywnym panelu komponent obrazu w aucie jest zwezony o pas natywny i przesuniety
+	 *  w prawo, wiec region przechwytywania (wezszy aspekt) zaczyna sie dalej od lewej. */
 	private val splitMarginPx: Int
 		get() {
 			var m = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
-			if (NativePanelTest.NATIVE_PANEL_TEST) m += NativePanelTest.PANEL_WIDTH_PX / 2
+			if (NativePanel.ENABLED) m += NativePanel.PANEL_WIDTH_PX / 2
 			return m
 		}
 
@@ -135,6 +134,12 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 
 	/** Aktualizuje panel prowadzenia; null = ukryj (brak nawigacji) */
 	fun updateGuidance(g: NavigationGuidance?) {
+		if (NativePanel.ENABLED) {
+			// panel w bitmapie wylaczony - dane prowadzenia ida natywnym pasem RHMI
+			// (NativePanel/NativePanelRenderer), a klatki mapy sa o pas panelu mniejsze
+			navPanel?.visibility = View.GONE
+			return
+		}
 		if (g == null) {
 			navPanel?.visibility = View.GONE
 			return
@@ -231,31 +236,8 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		return sb
 	}
 
-	/** Katalog manewr -> ikona znaku. Nieznany typ: strzalka prosto + log (do uzupelnienia katalogu). */
-	private fun maneuverIconRes(type: String?): Int = when (type) {
-		null, "", "straight" -> R.drawable.ic_gmap_straight
-		"turn-left" -> R.drawable.ic_gmap_turn_left
-		"turn-right" -> R.drawable.ic_gmap_turn_right
-		"turn-slight-left" -> R.drawable.ic_gmap_slight_left
-		"turn-slight-right" -> R.drawable.ic_gmap_slight_right
-		"turn-sharp-left" -> R.drawable.ic_gmap_sharp_left
-		"turn-sharp-right" -> R.drawable.ic_gmap_sharp_right
-		"uturn-left" -> R.drawable.ic_gmap_uturn_left
-		"uturn-right" -> R.drawable.ic_gmap_uturn_right
-		"ramp-left" -> R.drawable.ic_gmap_ramp_left
-		"ramp-right" -> R.drawable.ic_gmap_ramp_right
-		"merge" -> R.drawable.ic_gmap_merge
-		"fork-left" -> R.drawable.ic_gmap_fork_left
-		"fork-right" -> R.drawable.ic_gmap_fork_right
-		"keep-left" -> R.drawable.ic_gmap_keep_left
-		"keep-right" -> R.drawable.ic_gmap_keep_right
-		"ferry", "ferry-train" -> R.drawable.ic_gmap_ferry
-		"destination" -> R.drawable.ic_gmap_destination
-		else -> {
-			Log.w(TAG, "Nieznany manewr Google: '$type' - fallback na strzalke prosto")
-			R.drawable.ic_gmap_straight
-		}
-	}
+	/** Katalog manewr -> ikona znaku przeniesiony do ManeuverIcons (wspolny z NativePanelRenderer). */
+	private fun maneuverIconRes(type: String?): Int = ManeuverIcons.res(type)
 
 	override fun onStart() {
 		super.onStart()
@@ -272,9 +254,11 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
 		val margin = splitMarginPx
-		// lewy padding = margines splitu + szerokosc panelu, zeby pozycja centrowala sie
-		// w widocznym obszarze NA PRAWO od panelu, nie w srodku calego obrazu
-		map?.setPadding(margin + panelWidthPx, 0, margin, 0)
+		// panel natywny: caly kadr to mapa (panel poza bitmapa) -> symetryczny padding;
+		// panel w bitmapie: lewy padding powiekszony o panel, zeby pozycja centrowala sie
+		// w widocznym obszarze NA PRAWO od panelu
+		val leftPad = if (NativePanel.ENABLED) margin else margin + panelWidthPx
+		map?.setPadding(leftPad, 0, margin, 0)
 		// panel tez musi sie dopasowac do biezacego trybu (full/split)
 		layoutNavPanel()
 

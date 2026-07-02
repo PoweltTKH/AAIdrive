@@ -42,7 +42,7 @@ class GMapsController(private val context: Context,
 		handler.post {
 			val loc = currentLocation
 			if (nav.currentNavDestination != null && loc != null) {
-				projection?.updateGuidance(nav.updateGuidance(loc))
+				pushGuidance(nav.updateGuidance(loc))
 				lastGuidanceUiMs = System.currentTimeMillis()
 			}
 		}
@@ -134,21 +134,11 @@ class GMapsController(private val context: Context,
 			val guidance = navController.updateGuidance(location)
 			val now = System.currentTimeMillis()
 			if (now - lastGuidanceUiMs >= GUIDANCE_UI_INTERVAL_MS) {
-				projection?.updateGuidance(guidance)
+				pushGuidance(guidance)
 				lastGuidanceUiMs = now
-
-				// EKSPERYMENT native panel: te same dane do natywnych komponentow RHMI (porownanie)
-				// maneuverText = PELNA instrukcja (bez skracania) - celowo, to test ucinania natywnej labelki
-				if (NativePanelTest.NATIVE_PANEL_TEST && guidance != null) {
-					NativePanelTest.update(
-							renderNativePanelTestIcon(guidance.maneuverArrow),
-							guidance.maneuverText,
-							"Przyjazd " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(guidance.etaEpochMillis)),
-							"Pozostało " + formatNativePanelDistance(guidance.remainingDistanceMeters))
-				}
 			}
 		} else {
-			projection?.updateGuidance(null)
+			pushGuidance(null)
 		}
 
 		// check to re-apply day/night settings after an interval
@@ -273,24 +263,34 @@ class GMapsController(private val context: Context,
 		}
 	}
 
-	/** EKSPERYMENT native panel: ikona manewru (glif tekstowy) jako PNG dla raImageModel 530 */
-	private fun renderNativePanelTestIcon(maneuverArrow: String): ByteArray {
-		val s = 120
-		val bmp = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
-		val canvas = android.graphics.Canvas(bmp)
-		val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-			color = 0xFFFFFFFF.toInt()
-			textSize = s * 0.72f
-			textAlign = android.graphics.Paint.Align.CENTER
+	// klucz tresci ostatnio wyslanego PNG panelu - wysylamy obraz tylko przy realnej zmianie
+	private var lastPanelKey: String? = null
+
+	/** Jednolity punkt aktualizacji prowadzenia: panel w bitmapie (flaga off) i/lub pas natywny */
+	private fun pushGuidance(guidance: NavigationGuidance?) {
+		projection?.updateGuidance(guidance)
+		if (!NativePanel.ENABLED) return
+		if (guidance == null) {
+			if (lastPanelKey != "") {
+				lastPanelKey = ""
+				NativePanel.updateDistance(" ")
+				NativePanel.updatePanelImage(NativePanelRenderer.renderEmpty())
+			}
+			return
 		}
-		val y = s / 2f - (paint.descent() + paint.ascent()) / 2f
-		canvas.drawText(maneuverArrow, s / 2f, y, paint)
-		val out = java.io.ByteArrayOutputStream()
-		bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-		return out.toByteArray()
+		// dystans do manewru: mala labelka, deduplikacja w NativePanel
+		NativePanel.updateDistance(formatNativePanelDistance(guidance.distanceToTurnMeters))
+		// PNG panelu: tylko gdy zmieni sie tresc (manewr/instrukcja/ETA/pozostalo z grubym ziarnem)
+		val key = "${guidance.maneuverType}|${guidance.isRoundabout}|${guidance.roundaboutExit}|" +
+				"${guidance.maneuverText}|${NativePanelRenderer.formatEta(guidance.etaEpochMillis)}|" +
+				NativePanelRenderer.formatRemaining(guidance.remainingDistanceMeters)
+		if (key != lastPanelKey) {
+			lastPanelKey = key
+			NativePanel.updatePanelImage(NativePanelRenderer.render(context, guidance))
+		}
 	}
 
-	/** EKSPERYMENT native panel: format dystansu jak w panelu (kopia lokalna na czas testu) */
+	/** Format dystansu do manewru (ziarno 10 m pod 1 km - jak w dotychczasowym panelu) */
 	private fun formatNativePanelDistance(m: Double): String {
 		return if (m < 1000) "${(Math.round(m / 10.0) * 10).toInt()} m"
 		else "%.1f km".format(m / 1000.0)
@@ -305,6 +305,6 @@ class GMapsController(private val context: Context,
 	override fun stopNavigation() {
 		// clear out previous nav
 		navController.stopNavigation()
-		projection?.updateGuidance(null)
+		pushGuidance(null)
 	}
 }

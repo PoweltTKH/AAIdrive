@@ -5,7 +5,7 @@ import de.bmw.idrive.BMWRemoting
 import io.bimmergestalt.idriveconnectkit.RHMIDimensions
 import io.bimmergestalt.idriveconnectkit.rhmi.*
 import me.hufman.androidautoidrive.carapp.maps.FrameUpdater
-import me.hufman.androidautoidrive.carapp.maps.NativePanelTest
+import me.hufman.androidautoidrive.carapp.maps.NativePanel
 
 /**
  * Callbacks for user interactions with the fullscreen display
@@ -40,9 +40,9 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 	val inputList = state.componentsList.filterIsInstance<RHMIComponent.List>().first()
 	val focusEvent = state.app.events.values.filterIsInstance<RHMIEvent.FocusEvent>().first()
 
-	// PLAN B testu natywnego panelu: obraz mapy zwezony o lewy pas oddany natywnym komponentom
+	// natywny panel: obraz mapy zwezony o lewy pas oddany natywnym komponentom
 	private val nativePanelW: Int
-		get() = if (NativePanelTest.NATIVE_PANEL_TEST) NativePanelTest.PANEL_WIDTH_PX else 0
+		get() = if (NativePanel.ENABLED) NativePanel.PANEL_WIDTH_PX else 0
 
 	fun initWidgets() {
 		// set up the components on the map
