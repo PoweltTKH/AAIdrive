@@ -8,6 +8,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import me.hufman.androidautoidrive.R
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
