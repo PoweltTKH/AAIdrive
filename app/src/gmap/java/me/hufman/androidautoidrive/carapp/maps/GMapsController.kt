@@ -34,9 +34,18 @@ class GMapsController(private val context: Context,
 	private val GUIDANCE_UI_INTERVAL_MS = 1000L
 	private var lastGuidanceUiMs = 0L
 
-	val navController = GMapsNavController.getInstance(context, carLocationProvider) {
+	val navController = GMapsNavController.getInstance(context, carLocationProvider) { nav ->
 		drawNavigation()
-		mapAppMode.currentNavDestination = it.currentNavDestination
+		mapAppMode.currentNavDestination = nav.currentNavDestination
+		// FIX: pokaz panel prowadzenia od razu po przeliczeniu trasy - wczesniej czekal na
+		// nastepny fix GPS, przez co pierwsze wejscie w mape bylo bez belki z danymi
+		handler.post {
+			val loc = currentLocation
+			if (nav.currentNavDestination != null && loc != null) {
+				projection?.updateGuidance(nav.updateGuidance(loc))
+				lastGuidanceUiMs = System.currentTimeMillis()
+			}
+		}
 	}
 	val gMapLocationSource = GMapsLocationSource()
 	var currentLocation: Location? = null

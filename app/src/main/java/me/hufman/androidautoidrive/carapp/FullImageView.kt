@@ -5,6 +5,7 @@ import de.bmw.idrive.BMWRemoting
 import io.bimmergestalt.idriveconnectkit.RHMIDimensions
 import io.bimmergestalt.idriveconnectkit.rhmi.*
 import me.hufman.androidautoidrive.carapp.maps.FrameUpdater
+import me.hufman.androidautoidrive.carapp.maps.NativePanelTest
 
 /**
  * Callbacks for user interactions with the fullscreen display
@@ -39,6 +40,10 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 	val inputList = state.componentsList.filterIsInstance<RHMIComponent.List>().first()
 	val focusEvent = state.app.events.values.filterIsInstance<RHMIEvent.FocusEvent>().first()
 
+	// PLAN B testu natywnego panelu: obraz mapy zwezony o lewy pas oddany natywnym komponentom
+	private val nativePanelW: Int
+		get() = if (NativePanelTest.NATIVE_PANEL_TEST) NativePanelTest.PANEL_WIDTH_PX else 0
+
 	fun initWidgets() {
 		// set up the components on the map
 		state.getTextModel()?.asRaDataModel()?.value = title
@@ -51,9 +56,9 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		state.focusCallback = FocusCallback { focused ->
 			if (focused) {
 				Log.i(TAG, "Showing map on full screen")
-				imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth)
+				imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth - nativePanelW)
 				imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, config.rhmiDimensions.visibleHeight)
-				frameUpdater.showWindow(config.rhmiDimensions.visibleWidth, config.rhmiDimensions.visibleHeight, imageModel)
+				frameUpdater.showWindow(config.rhmiDimensions.visibleWidth - nativePanelW, config.rhmiDimensions.visibleHeight, imageModel)
 				focusEvent.triggerEvent(mapOf(0 to inputList.id, 41 to 3))
 			} else {
 				Log.i(TAG, "Hiding map on full screen")
@@ -113,9 +118,10 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		inputList.setProperty(RHMIProperty.PropertyId.BOOKMARKABLE, true)
 
 		imageComponent.setVisible(true)
-		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft)    // positionX
+		// pod flaga testu natywnego panelu obraz przesuniety w prawo o pas natywny i zwezony
+		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft + nativePanelW)    // positionX
 		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -config.rhmiDimensions.paddingTop)    // positionY
-		imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth)
+		imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth - nativePanelW)
 		imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, config.rhmiDimensions.visibleHeight)
 	}
 }

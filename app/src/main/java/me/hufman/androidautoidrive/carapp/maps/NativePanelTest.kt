@@ -19,6 +19,10 @@ object NativePanelTest {
 	// ====== JEDYNY WLACZNIK ======
 	const val NATIVE_PANEL_TEST = true   // WLACZONE na build testowy (jazda porownawcza); po tescie wracamy na false
 
+	/** PLAN B: szerokosc lewego pasa oddanego natywnym komponentom; komponent obrazu mapy
+	 *  w aucie jest o tyle zwezony i przesuniety w prawo (bez nakladania -> z-order bez znaczenia). */
+	const val PANEL_WIDTH_PX = 223
+
 	@Volatile private var handler: Handler? = null
 	@Volatile private var sink: ((iconPng: ByteArray?, line1: String, line2: String, line3: String) -> Unit)? = null
 

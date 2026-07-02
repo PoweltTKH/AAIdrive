@@ -68,6 +68,17 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private val panelWidthPx: Int
 		get() = (sidebarDimensions.appWidth * 0.30).toInt()
 
+	/** Lewy margines widocznego obszaru na wirtualnym ekranie.
+	 *  Plan B natywnego panelu: komponent obrazu w aucie jest zwezony o pas natywny i przesuniety
+	 *  w prawo, wiec region przechwytywania (wezszy aspekt) zaczyna sie dalej od lewej -
+	 *  margines rosnie o polowe szerokosci pasa, by panel w bitmapie pozostal w kadrze. */
+	private val splitMarginPx: Int
+		get() {
+			var m = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
+			if (NativePanelTest.NATIVE_PANEL_TEST) m += NativePanelTest.PANEL_WIDTH_PX / 2
+			return m
+		}
+
 	@SuppressLint("MissingPermission")
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -113,7 +124,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	/** Dopasowuje panel do widocznego obszaru mapy (w trybie split mapa jest wezsza i wycentrowana) */
 	private fun layoutNavPanel() {
 		val panel = navPanel ?: return
-		val margin = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
+		val margin = splitMarginPx
 		val lp = panel.layoutParams
 		if (lp is ViewGroup.MarginLayoutParams) {
 			lp.leftMargin = margin
@@ -129,8 +140,9 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			return
 		}
 		navPanel?.visibility = View.VISIBLE
-		// rondo: rysowana ikona znaku (pierscien + strzalka zjazdu) + numer zjazdu; reszta: glif tekstowy
-		navArrow?.text = if (g.isRoundabout) buildRoundaboutLabel(g.roundaboutExit) else g.maneuverArrow
+		// wszystkie manewry jako ikony w stylu znakow drogowych; rondo (C-12) z numerem zjazdu
+		navArrow?.text = if (g.isRoundabout) buildRoundaboutLabel(g.roundaboutExit)
+				else buildManeuverLabel(maneuverIconRes(g.maneuverType))
 		navInstruction?.text = g.maneuverText
 		navDistance?.text = formatDistance(g.distanceToTurnMeters)
 		navRemaining?.text = formatDistance(g.remainingDistanceMeters)
@@ -158,10 +170,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			locationPuck = map.addMarker(MarkerOptions()
 					.position(pos)
 					.icon(icon)
-					// anchor w CENTROIDZIE glifu (nie srodku bitmapy): ksztalt grota ma srodek masy
-					// ~62% wysokosci (czubek 10%, ramiona 90%, wciecie 70%) - anchor 0.5 powodowal
-					// wizualne odklejenie grota od trasy; obrot tez pivotuje wokol anchora
-					.anchor(0.5f, 0.62f)
+					// glif jest teraz symetryczny wokol srodka bitmapy (okrag + chevron),
+					// wiec anchor 0.5/0.5 jest jednoznaczny; jesli grot NADAL odsuniety od trasy,
+					// to blad lateralny GPS z auta (CDS), nie geometria - wtedy: snap do polilinii
+					.anchor(0.5f, 0.5f)
 					.flat(true)           // lezy na mapie -> rotation == kurs geograficzny
 					.rotation(rot)
 					.zIndex(1000f))
@@ -176,37 +188,73 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		locationPuck = null
 	}
 
-	/** Kompaktowy grot nawigacyjny (nieco wiekszy niz kropka): niebieskie wypelnienie + bialy obrys, czubek na polnoc. */
+	/** Grot pozycji w stylu GMaps: niebieski okrag z bialym pierscieniem + bialy chevron kursu.
+	 *  Symetryczny wokol srodka bitmapy -> wizualny srodek == pozycja GPS, bez niejednoznacznosci anchora. */
 	private fun buildLocationPuck(): BitmapDescriptor {
-		val s = 56
+		val s = 64
 		val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
 		val c = Canvas(bmp)
-		val w = s.toFloat(); val h = s.toFloat()
+		val cx = s / 2f; val cy = s / 2f; val r = s * 0.30f
+		val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1A73E8.toInt(); style = Paint.Style.FILL }
+		val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.06f
+		}
+		val chevron = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
+		c.drawCircle(cx, cy, r, fill)
+		c.drawCircle(cx, cy, r, ring)
 		val path = Path().apply {
-			moveTo(w / 2f, h * 0.10f)      // czubek (polnoc)
-			lineTo(w * 0.82f, h * 0.90f)   // prawy dol
-			lineTo(w / 2f, h * 0.70f)      // wciecie
-			lineTo(w * 0.18f, h * 0.90f)   // lewy dol
+			moveTo(cx, cy - r * 0.62f)                  // czubek chevronu (kurs)
+			lineTo(cx - r * 0.52f, cy + r * 0.45f)
+			lineTo(cx, cy + r * 0.12f)                  // wciecie
+			lineTo(cx + r * 0.52f, cy + r * 0.45f)
 			close()
 		}
-		val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1A73E8.toInt(); style = Paint.Style.FILL }
-		val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.07f; strokeJoin = Paint.Join.ROUND
-		}
-		c.drawPath(path, fill)
-		c.drawPath(path, edge)
+		c.drawPath(path, chevron)
 		return BitmapDescriptorFactory.fromBitmap(bmp)
 	}
 
 	/** Etykieta ronda: ikona w stylu znaku C-12 (vector drawable, biale strzalki w okregu) + numer zjazdu obok. */
 	private fun buildRoundaboutLabel(exit: Int?): CharSequence {
+		return iconLabel(R.drawable.ic_gmap_roundabout, if (exit != null) "  $exit" else null)
+	}
+
+	/** Etykieta zwyklego manewru: sama ikona znaku. */
+	private fun buildManeuverLabel(resId: Int): CharSequence = iconLabel(resId, null)
+
+	private fun iconLabel(resId: Int, suffix: String?): CharSequence {
 		val sizePx = (navArrow?.textSize ?: 44f).toInt().coerceAtLeast(24)
-		val icon = context.getDrawable(R.drawable.ic_gmap_roundabout)!!.mutate()
+		val icon = context.getDrawable(resId)!!.mutate()
 		icon.setBounds(0, 0, sizePx, sizePx)
 		val sb = SpannableStringBuilder(" ")
 		sb.setSpan(ImageSpan(icon, ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-		if (exit != null) sb.append("  $exit")
+		if (suffix != null) sb.append(suffix)
 		return sb
+	}
+
+	/** Katalog manewr -> ikona znaku. Nieznany typ: strzalka prosto + log (do uzupelnienia katalogu). */
+	private fun maneuverIconRes(type: String?): Int = when (type) {
+		null, "", "straight" -> R.drawable.ic_gmap_straight
+		"turn-left" -> R.drawable.ic_gmap_turn_left
+		"turn-right" -> R.drawable.ic_gmap_turn_right
+		"turn-slight-left" -> R.drawable.ic_gmap_slight_left
+		"turn-slight-right" -> R.drawable.ic_gmap_slight_right
+		"turn-sharp-left" -> R.drawable.ic_gmap_sharp_left
+		"turn-sharp-right" -> R.drawable.ic_gmap_sharp_right
+		"uturn-left" -> R.drawable.ic_gmap_uturn_left
+		"uturn-right" -> R.drawable.ic_gmap_uturn_right
+		"ramp-left" -> R.drawable.ic_gmap_ramp_left
+		"ramp-right" -> R.drawable.ic_gmap_ramp_right
+		"merge" -> R.drawable.ic_gmap_merge
+		"fork-left" -> R.drawable.ic_gmap_fork_left
+		"fork-right" -> R.drawable.ic_gmap_fork_right
+		"keep-left" -> R.drawable.ic_gmap_keep_left
+		"keep-right" -> R.drawable.ic_gmap_keep_right
+		"ferry", "ferry-train" -> R.drawable.ic_gmap_ferry
+		"destination" -> R.drawable.ic_gmap_destination
+		else -> {
+			Log.w(TAG, "Nieznany manewr Google: '$type' - fallback na strzalke prosto")
+			R.drawable.ic_gmap_straight
+		}
 	}
 
 	override fun onStart() {
@@ -223,7 +271,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	fun applySettings() {
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
-		val margin = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
+		val margin = splitMarginPx
 		// lewy padding = margines splitu + szerokosc panelu, zeby pozycja centrowala sie
 		// w widocznym obszarze NA PRAWO od panelu, nie w srodku calego obrazu
 		map?.setPadding(margin + panelWidthPx, 0, margin, 0)

@@ -26,7 +26,10 @@ data class NavigationGuidance(
 		val remainingDistanceMeters: Double,
 		val etaEpochMillis: Long,
 		val isRoundabout: Boolean = false,
-		val roundaboutExit: Int? = null
+		val roundaboutExit: Int? = null,
+		/** surowy manewr Google (turn-left, ramp-right, keep-left...) lub nasze: "straight", "destination";
+		 *  keep-x/ramp-x z tekstem "zjazd" w instrukcji mapowane na ramp-x (ikona zjazdu z drogi szybkiej) */
+		val maneuverType: String? = null
 )
 
 class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: CarLocationProvider, var callback: (GMapsNavController) -> Unit) {
@@ -174,6 +177,7 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		val instr: String
 		var isRoundabout = false
 		var roundaboutExit: Int? = null
+		var maneuverType: String? = null
 		if (upcomingIdx < steps.size) {
 			val next = steps[upcomingIdx]
 			@Suppress("DEPRECATION")
@@ -185,11 +189,13 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				roundaboutExit = exit
 				if (exit != null) "\u21BB" + circledNumber(exit) else "\u21BB"
 			} else {
+				maneuverType = maneuverTypeFor(maneuver, nextInstr)
 				arrowFor(maneuver)
 			}
 			instr = nextInstr
 		} else {
 			// biezacy krok jest ostatni -> dojazd do celu
+			maneuverType = "destination"
 			arrow = "\u25C9"
 			instr = "Cel podróży"
 		}
@@ -201,8 +207,21 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				remainingDistanceMeters = remaining,
 				etaEpochMillis = eta,
 				isRoundabout = isRoundabout,
-				roundaboutExit = roundaboutExit
+				roundaboutExit = roundaboutExit,
+				maneuverType = maneuverType
 		)
+	}
+
+	/** Normalizuje manewr Google do typu ikony. Heurystyka zjazdu: keep-x/ramp-x z "zjazd/zjedz"
+	 *  w polskiej instrukcji -> ramp-x (piktogram zjazdu z drogi szybkiej zamiast "trzymaj sie pasa"). */
+	private fun maneuverTypeFor(maneuver: String?, instruction: String): String {
+		if (maneuver == null) return "straight"   // pierwszy krok trasy nie ma pola maneuver
+		val lower = instruction.lowercase()
+		val isExit = lower.contains("zjazd") || lower.contains("zjed")
+		if (isExit && (maneuver.startsWith("keep") || maneuver.startsWith("ramp"))) {
+			return if (maneuver.endsWith("left")) "ramp-left" else "ramp-right"
+		}
+		return maneuver
 	}
 
 	private fun arrowFor(maneuver: String?): String {
