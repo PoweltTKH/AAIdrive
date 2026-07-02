@@ -8,7 +8,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Point
-import android.graphics.drawable.BitmapDrawable
 import android.location.Location
 import android.os.Bundle
 import android.text.Spannable
@@ -159,7 +158,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			locationPuck = map.addMarker(MarkerOptions()
 					.position(pos)
 					.icon(icon)
-					.anchor(0.5f, 0.5f)   // obrot wokol srodka
+					// anchor w CENTROIDZIE glifu (nie srodku bitmapy): ksztalt grota ma srodek masy
+					// ~62% wysokosci (czubek 10%, ramiona 90%, wciecie 70%) - anchor 0.5 powodowal
+					// wizualne odklejenie grota od trasy; obrot tez pivotuje wokol anchora
+					.anchor(0.5f, 0.62f)
 					.flat(true)           // lezy na mapie -> rotation == kurs geograficzny
 					.rotation(rot)
 					.zIndex(1000f))
@@ -196,33 +198,15 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		return BitmapDescriptorFactory.fromBitmap(bmp)
 	}
 
-	/** Etykieta ronda: rysowana ikona znaku drogowego (pierscien + strzalka zjazdu) + numer zjazdu. */
+	/** Etykieta ronda: ikona w stylu znaku C-12 (vector drawable, biale strzalki w okregu) + numer zjazdu obok. */
 	private fun buildRoundaboutLabel(exit: Int?): CharSequence {
 		val sizePx = (navArrow?.textSize ?: 44f).toInt().coerceAtLeast(24)
+		val icon = context.getDrawable(R.drawable.ic_gmap_roundabout)!!.mutate()
+		icon.setBounds(0, 0, sizePx, sizePx)
 		val sb = SpannableStringBuilder(" ")
-		sb.setSpan(ImageSpan(roundaboutIcon(sizePx), ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+		sb.setSpan(ImageSpan(icon, ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 		if (exit != null) sb.append("  $exit")
 		return sb
-	}
-
-	/** Ikona ronda w stylu znaku: pierscien, wlot od dolu, strzalka zjazdu w prawo-gore. */
-	private fun roundaboutIcon(s: Int): BitmapDrawable {
-		val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-		val c = Canvas(bmp)
-		val cx = s / 2f; val cy = s * 0.45f; val r = s * 0.26f
-		val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.08f
-			strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-		}
-		c.drawCircle(cx, cy, r, p)                        // pierscien ronda
-		c.drawLine(cx, s * 0.98f, cx, cy + r, p)          // wlot od dolu
-		val ex = cx + r * 1.15f; val ey = cy - r * 1.15f  // zjazd w prawo-gore
-		c.drawLine(cx + r * 0.35f, cy - r * 0.35f, ex, ey, p)
-		val head = Path().apply {                         // grot zjazdu
-			moveTo(ex - s * 0.14f, ey + s * 0.02f); lineTo(ex, ey); lineTo(ex - s * 0.02f, ey + s * 0.14f)
-		}
-		c.drawPath(head, p)
-		return BitmapDrawable(resources, bmp).apply { setBounds(0, 0, s, s) }
 	}
 
 	override fun onStart() {

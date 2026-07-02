@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikona ronda w stylu znaku C-12: trzy zakrzywione strzalki w okregu,
+     biale, bez tla (tlo daje zielony blok panelu). Numer zjazdu dodawany obok w kodzie. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- jeden segment: luk ~60 stopni + grot; powielony obrotem co 120 stopni -->
+    <group android:pivotX="24" android:pivotY="24" android:rotation="0">
+        <path
+            android:pathData="M 24,10 A 14,14 0 0 1 36.1,17"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M 37.9,22.8 L 38.7,13.7 L 32.2,18.3 Z" />
+    </group>
+    <group android:pivotX="24" android:pivotY="24" android:rotation="120">
+        <path
+            android:pathData="M 24,10 A 14,14 0 0 1 36.1,17"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M 37.9,22.8 L 38.7,13.7 L 32.2,18.3 Z" />
+    </group>
+    <group android:pivotX="24" android:pivotY="24" android:rotation="240">
+        <path
+            android:pathData="M 24,10 A 14,14 0 0 1 36.1,17"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M 37.9,22.8 L 38.7,13.7 L 32.2,18.3 Z" />
+    </group>
+</vector>

@@ -127,6 +127,16 @@ class GMapsController(private val context: Context,
 			if (now - lastGuidanceUiMs >= GUIDANCE_UI_INTERVAL_MS) {
 				projection?.updateGuidance(guidance)
 				lastGuidanceUiMs = now
+
+				// EKSPERYMENT native panel: te same dane do natywnych komponentow RHMI (porownanie)
+				// maneuverText = PELNA instrukcja (bez skracania) - celowo, to test ucinania natywnej labelki
+				if (NativePanelTest.NATIVE_PANEL_TEST && guidance != null) {
+					NativePanelTest.update(
+							renderNativePanelTestIcon(guidance.maneuverArrow),
+							guidance.maneuverText,
+							"Przyjazd " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(guidance.etaEpochMillis)),
+							"Pozostało " + formatNativePanelDistance(guidance.remainingDistanceMeters))
+				}
 			}
 		} else {
 			projection?.updateGuidance(null)
@@ -252,6 +262,29 @@ class GMapsController(private val context: Context,
 		} else {
 			action()
 		}
+	}
+
+	/** EKSPERYMENT native panel: ikona manewru (glif tekstowy) jako PNG dla raImageModel 530 */
+	private fun renderNativePanelTestIcon(maneuverArrow: String): ByteArray {
+		val s = 120
+		val bmp = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
+		val canvas = android.graphics.Canvas(bmp)
+		val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+			color = 0xFFFFFFFF.toInt()
+			textSize = s * 0.72f
+			textAlign = android.graphics.Paint.Align.CENTER
+		}
+		val y = s / 2f - (paint.descent() + paint.ascent()) / 2f
+		canvas.drawText(maneuverArrow, s / 2f, y, paint)
+		val out = java.io.ByteArrayOutputStream()
+		bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+		return out.toByteArray()
+	}
+
+	/** EKSPERYMENT native panel: format dystansu jak w panelu (kopia lokalna na czas testu) */
+	private fun formatNativePanelDistance(m: Double): String {
+		return if (m < 1000) "${(Math.round(m / 10.0) * 10).toInt()} m"
+		else "%.1f km".format(m / 1000.0)
 	}
 
 	override fun recalcNavigation() {
