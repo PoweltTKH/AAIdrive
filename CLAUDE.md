@@ -25,21 +25,41 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - Numer zjazdu z ronda: tylko z tekstu `html_instructions` (polskie liczebniki), brak pola strukturalnego.
 - `location.bearing` — użyteczne do „heading-up".
 - **Semantyka kroków Google:** `html_instructions`/`maneuver` opisuje manewr na POCZĄTKU kroku. Jadąc krokiem `cur`, nadchodzący manewr to `krok[cur+1]`, wykonywany w `krok[cur].endLocation`.
+- **Protokół RHMI przyjmuje TYLKO pełne bitmapy** (`rhmi_setData` na modelu obrazu) — delta/dirty-rects nie istnieją. `rhmi_setData` jest synchroniczne (blokuje do ACK z auta).
+- **Łącze BT ma dwa reżimy** (zmierzone z `gmap_perf.csv`): ~50 KB/s (częsty, bandwidth-bound, czas ∝ bajtom) i ~115 KB/s (latency-bound ~386 ms/klatkę). Optymalizować pod zły dzień.
+- **Labelki RHMI nie są stylowalne** (font/rozmiar/kolor = firmware auta). Piksele 1:1 tylko przez komponenty obrazu.
+- **Natywne komponenty NAŁOŻONE na obraz nie renderują się** (z-order ID6); obok obrazu — działają.
+- **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
+- Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
 
-## Stan bieżący — build #9 (commit bca3c52) — DOBRY
-Podpis APK zweryfikowany: SHA-1 `A1:DA:07:...` (zgodny ze Spotify). Spotify działa.
-Działa: Google Maps + turn-by-turn na iDrive po BT (split/Widescreen OFF); panel lewy w stylu GMaps (nagłówek manewru, Przyjazd/ETA, Pozostało, bez prędkości, tło `#FF1B1B1D`); slim styl mapy; rondo z numerem zjazdu; reroute (>70 m / 2 odczyty, interwał 10 s, reaguje tylko na zjazd z trasy NIE na korki); timing pokazuje nadchodzący manewr (`cur+1`), dystans do `krok[cur].endLocation`, na końcu „◉ Cel podróży".
+## Stan bieżący — commit a569b55 (wersja 1.4.3-73) — NATYWNY PANEL
+Architektura po rozdzieleniu panel/mapa (zysk zmierzony: bajty/klatkę 33→17,6 KB [−45%], fps 1,44→2,22 przy tym samym łączu ~50 KB/s, spiki 3× rzadsze):
+- **Mapa**: czysta bitmapa bez panelu, komponent obrazu zwężony o 223 px (`FullImageView` + `NativePanel.PANEL_WIDTH_PX`), JPEG adaptacyjny jak wcześniej.
+- **Panel natywny (lewy pas)**: dystans do manewru w TYTULE stanu (mały setData ~1/s, deduplikowany); zielony blok + Przyjazd/Pozostało jako **PNG w naszym stylu** (`NativePanelRenderer` → `image 134`, wysyłany tylko przy zmianie treści, „Pozostało" ziarno 100 m). Flaga `NativePanel.ENABLED=false` przywraca stary panel w bitmapie.
+- **Ikony manewrów jak znaki drogowe**: 19 vector drawables `ic_gmap_*` (katalog `ManeuverIcons`), pełne mapowanie manewrów Google + heurystyka zjazdu (keep/ramp + „zjazd" w instrukcji → piktogram zjazdu); rondo C-12 z numerem; nieznany manewr → prosto + log.
+- **Grot pozycji**: okrąg+chevron (styl GMaps), snap wizualny do polilinii trasy (do 35 m, kurs z azymutu segmentu) — kompensuje błąd lateralny GPS auta.
+- **Timing**: manewr `cur+1`, dystans do `krok[cur].endLocation`; <15 m od końca kroku = manewr wykonany → przełączenie kroku; panel pokazuje się od razu po przeliczeniu trasy; reroute bez zmian (>70 m / 2 odczyty / 10 s).
+- **Instrumentacja `PERF_LOG=true`** (`MapFramePerfLog`): agregaty 2 s do `Android/data/me.hufman.androidautoidrive/files/gmap_perf.csv` (bytes, compress ms, round-trip setData, fps); wyjmowanie przez MTP bez adb; analiza: `analyze.py` (u Pawła na pulpicie/scratchpad).
+Do weryfikacji w jeździe: snap grota, dystans w tytule, prawy margines PNG (26 px), przełączanie kroku na węzłach.
 
 ## Kluczowe pliki (flavor gmap)
-- `GMapsNavController.kt` — logika nawigacji, dopasowanie do polilinii kroku, snap do przodu, reroute, parsowanie ronda, pokazywanie manewru `cur+1`.
-- `GMapsProjection.kt` — panel lewy dopasowany do splitu, tło nieprzezroczyste, slim domyślny, prędkość usunięta.
-- `gmaps_projection.xml` (layout) — układ panelu.
-- `GMapsController.kt`, `FrameUpdater.kt`, `MapAppMode.kt`, `gmaps_style_slim.json` — wcześniejsze buildy, bez zmian.
+- `GMapsNavController.kt` — logika nawigacji: snap do kroku, przełączanie kroku <15 m, reroute, parsowanie ronda, `maneuverType` (+ heurystyka zjazdu), manewr `cur+1`.
+- `GMapsController.kt` — kamera, grot (snap do trasy `snapToRouteForPuck`), `pushGuidance` (panel bitmapowy i/lub natywny, dedup PNG po kluczu treści).
+- `GMapsProjection.kt` — projekcja mapy; przy `NativePanel.ENABLED` panel bitmapowy ukryty, padding symetryczny; grot `buildLocationPuck`.
+- `NativePanelRenderer.kt` + `ManeuverIcons.kt` + `res/drawable/ic_gmap_*.xml` — PNG panelu i katalog ikon-znaków.
+- `NativePanel.kt` (main) — flaga ENABLED, szerokość pasa, mostek na wątek car (dedup dystansu).
+- `MapApp.kt` (main) — podpięcie natywnych komponentów stanu 19 (pozycje, sinki), `FullImageView.kt` (main) — zwężenie obrazu mapy.
+- `MapFramePerfLog.kt` (main) — instrumentacja CSV; `FrameUpdater.kt` — pomiary wokół compress/setData.
+- `gmaps_projection.xml`, `MapAppMode.kt`, `gmaps_style_slim.json` — bez większych zmian.
 
 ## Keystore (najważniejsza lekcja)
 Stały debug keystore (SHA-1 `A1:DA:...`, storepass/keypass `android`, alias `androiddebugkey`, base64 w sekrecie `DEBUG_KEYSTORE_BASE64`). Jawny `signingConfig` w `build.gradle` → `../debug.keystore` (NIE domyślna ścieżka AGP `~/.android/` — na runnerze GitHub nie działa, build #8 podpisał złym kluczem). Workflow dekoduje sekret do `$GITHUB_WORKSPACE/debug.keystore`. Stały podpis = instalacja „Aktualizuj" bez odinstalowania + zgodność ze Spotify App Remote.
 
 ## Kolejka
-1. Nawigacja — test w ruchu (timing, rondo, reroute).
-2. Build C — widok 3D / za samochodem: tilt + heading-up z `location.bearing`, jako przełączniki. Kompromis: więcej zmian klatki = gorsza kompresja po BT.
-3. Drobne — `departure_time=now` w Directions (trasa świadoma ruchu + realniejsze ETA).
+1. Jazda weryfikacyjna commit a569b55: snap grota, dystans w tytule, margines PNG, przełączanie kroku; CSV → czy fps trzyma ≥2,2 (zły dzień łącza) / ~4–5 (dobry).
+2. Kosmetyka ikon-znaków ze zdjęć (kształty rysowane „na oko" — iterować jak C-12).
+3. Ostrzejszy JPEG w ruchu (q40) — panel już nie cierpi na kompresji; kolejne −25% bajtów.
+4. Rozstrzygnięcie reżimu łącza: jeśli trafi się dzień latency-bound (~115 KB/s) — prototyp pipeliningu (async setData, cap 2 klatki w locie); w reżimie 50 KB/s pipelining nic nie daje.
+5. Build C — widok 3D / za samochodem: tilt + heading-up z `location.bearing`, jako przełączniki. Kompromis: więcej zmian klatki = gorsza kompresja po BT.
+6. Drobne — `departure_time=now` w Directions (trasa świadoma ruchu + realniejsze ETA).
+7. Po zakończeniu strojenia: `PERF_LOG=false` (albo zostawić — koszt pomijalny).
