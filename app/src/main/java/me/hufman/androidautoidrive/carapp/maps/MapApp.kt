@@ -127,17 +127,11 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 			return
 		}
 
-		// dystans do manewru: natywna labelka u gory pasa (pod tytulem stanu); tyka ~1/s
-		labels.getOrNull(0)?.apply {
-			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 10)
-			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 56)
-			setEnabled(true)
-			setVisible(true)
-		}
-		// reszta panelu (zielony blok + Przyjazd/Pozostalo) jako PNG w naszym stylu, ponizej dystansu
+		// dystans do manewru idzie w TYTUL stanu (gorny pasek, zamiast "Map") - patrz distanceSink;
+		// labelki zostaja ukryte, a zielony blok (PNG) siedzi od razu pod tytulem - jak w starym panelu
 		extraImage?.apply {
 			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 0)
-			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 120)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 50)
 			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
 			setProperty(RHMIProperty.PropertyId.HEIGHT.id, 360)
 			setVisible(true)
@@ -148,13 +142,14 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		Log.i(TAG, "Setting up map transfer")
 		frameUpdater.start(handler)
 
-		// natywny panel: zapisy modeli RHMI na watku car (deduplikowana labelka + rzadki PNG)
+		// natywny panel: zapisy modeli RHMI na watku car (deduplikowany dystans + rzadki PNG)
 		if (NativePanel.ENABLED) {
-			val labels = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Label>()
 			val extraImage = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Image>().drop(1).firstOrNull()
 			NativePanel.attach(handler,
 					distanceSink = { distance ->
-						labels.getOrNull(0)?.getModel()?.asRaDataModel()?.value = distance
+						// dystans w tytule stanu (gorny pasek); poza nawigacja wraca "Map"
+						fullImageView.state.getTextModel()?.asRaDataModel()?.value =
+								if (distance.isBlank()) "Map" else distance
 					},
 					imageSink = { png ->
 						(extraImage?.getModel() as? RHMIModel.RaImageModel)?.value = png

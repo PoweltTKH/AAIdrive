@@ -152,10 +152,19 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 			offRouteCount = 0
 		}
 
-		val curStep = steps[currentStepIndex]
+		var curStep = steps[currentStepIndex]
 		// nastepny manewr wykonuje sie na KONCU biezacego kroku (== poczatek nastepnego kroku)
-		val distToTurn = distanceMeters(location.latitude, location.longitude,
+		var distToTurn = distanceMeters(location.latitude, location.longitude,
 				curStep.endLocation.lat, curStep.endLocation.lng)
+
+		// jestesmy tuz przy koncu kroku -> manewr wykonany, przelacz na nastepny krok;
+		// bez tego stojac juz na skrzyzowaniu panel dalej pokazywal poprzedni manewr (np. zjazd)
+		if (distToTurn < 15.0 && currentStepIndex < steps.size - 1) {
+			currentStepIndex += 1
+			curStep = steps[currentStepIndex]
+			distToTurn = distanceMeters(location.latitude, location.longitude,
+					curStep.endLocation.lat, curStep.endLocation.lng)
+		}
 
 		// pozostaly dystans do celu = do konca biezacego kroku + suma kolejnych krokow
 		var remaining = distToTurn
