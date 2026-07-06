@@ -50,6 +50,7 @@ interface AppSettings {
 		NAV_PREFER_CUSTOM_MAP("Nav_Prefer_Custom_Map", "false", "Prefer custom map nav over car nav"),
 		MAP_BUILDINGS("Map_Buildings", "true", "Maps 3D Buildings"),
 		MAP_NATIVE_PANEL("Map_Native_Panel", "true", "Show nav guidance in a native sidebar (saves Bluetooth transfer)"),
+		MAP_ROTATE("Map_Rotate", "false", "Rotate map towards driving direction (heading-up)"),
 		MAP_TILT("Map_Tilt", "false", "3D tilt and rotate the map"),
 		GMAPS_STYLE("GMaps_Style", "auto", "GMaps style"),
 		MAP_CUSTOM_STYLE("Mapbox_Custom_Style", "", "Mapbox custom style"),

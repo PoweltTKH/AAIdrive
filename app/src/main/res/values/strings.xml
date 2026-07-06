@@ -497,6 +497,7 @@
     <string name="MAP_TRAFFIC">Show traffic</string>
     <string name="MAP_BUILDINGS">Show 3D buildings</string>
     <string name="MAP_NATIVE_PANEL">Native nav panel (less BT)</string>
+    <string name="MAP_ROTATE">Rotate with driving direction</string>
     <string name="MAP_TILT">Tilt map</string>
     <string name="MAP_CUSTOM_STYLE">Use custom map style</string>
 

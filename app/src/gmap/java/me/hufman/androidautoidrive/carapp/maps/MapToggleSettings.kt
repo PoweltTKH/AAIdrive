@@ -8,5 +8,7 @@ object MapToggleSettings {
 			AppSettings.KEYS.MAP_BUILDINGS,
 			AppSettings.KEYS.MAP_TRAFFIC,
 			AppSettings.KEYS.MAP_NATIVE_PANEL,
+			AppSettings.KEYS.MAP_ROTATE,
+			AppSettings.KEYS.MAP_TILT,
 	)
 }

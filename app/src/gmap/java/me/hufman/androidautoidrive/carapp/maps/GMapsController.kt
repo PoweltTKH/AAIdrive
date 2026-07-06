@@ -9,6 +9,7 @@ import android.util.Log
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.*
+import me.hufman.androidautoidrive.AppSettings
 import me.hufman.androidautoidrive.AppSettingsObserver
 import me.hufman.androidautoidrive.R
 import me.hufman.androidautoidrive.maps.CarLocationProvider
@@ -64,6 +65,10 @@ class GMapsController(private val context: Context,
 	}
 	private var startZoom = 6f  // what zoom level we start the projection with
 	private var currentZoom = 15f
+
+	// ostatni sensowny kurs jazdy do trybu obrotu mapy (GPS nie daje bearing na postoju -
+	// trzymamy poprzedni, zeby mapa nie wracala do polnocy na swiatlach)
+	private var lastBearing = 0f
 
 	init {
 		carLocationProvider.callback = { location ->
@@ -177,8 +182,23 @@ class GMapsController(private val context: Context,
 		if (!animatingCamera || zoomingCamera) {
 			// if the camera is idle or we are zooming the camera already
 			val cameraLocation = LatLng(location.latitude, location.longitude)
+
+			// tryby widoku (przelaczniki w opcjach mapy, czytane na biezaco):
+			// 1. oba OFF -> 2D polnoc (domyslnie)   2. MAP_ROTATE -> 2D + obrot w kierunku jazdy
+			// 3. MAP_ROTATE + MAP_TILT -> 3D perspektywa + obrot (sam MAP_TILT = 3D polnoc)
+			val rotate = appSettings[AppSettings.KEYS.MAP_ROTATE].toBoolean()
+			val tilt = appSettings[AppSettings.KEYS.MAP_TILT].toBoolean()
+			if (location.hasBearing()) {
+				lastBearing = location.bearing
+			}
+			val cameraPosition = CameraPosition.Builder()
+					.target(cameraLocation)
+					.zoom(currentZoom)
+					.bearing(if (rotate) lastBearing else 0f)
+					.tilt(if (tilt) 50f else 0f)
+					.build()
 			projection?.map?.stopAnimation()
-			projection?.map?.animateCamera(CameraUpdateFactory.newLatLngZoom(cameraLocation, currentZoom), animationFinishedCallback)
+			projection?.map?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), animationFinishedCallback)
 			animatingCamera = true
 		}
 	}

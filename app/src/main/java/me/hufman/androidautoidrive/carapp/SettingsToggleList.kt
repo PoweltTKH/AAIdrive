@@ -34,6 +34,7 @@ class SettingsToggleList(val component: RHMIComponent.List, val appSettings: Mut
 				AppSettings.KEYS.MAP_SATELLITE-> L.MAP_SATELLITE
 				AppSettings.KEYS.MAP_BUILDINGS -> L.MAP_BUILDINGS
 				AppSettings.KEYS.MAP_NATIVE_PANEL -> L.MAP_NATIVE_PANEL
+				AppSettings.KEYS.MAP_ROTATE -> L.MAP_ROTATE
 				AppSettings.KEYS.MAP_TILT -> L.MAP_TILT
 				AppSettings.KEYS.MAP_CUSTOM_STYLE -> L.MAP_CUSTOM_STYLE
 				else -> ""
