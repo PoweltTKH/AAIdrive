@@ -32,12 +32,12 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
 - Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
 
-## Stan bieżący — commit a569b55 (wersja 1.4.3-73) — NATYWNY PANEL
+## Stan bieżący — commit d2813af (wersja 1.4.3-75) — NATYWNY PANEL + PRZEŁĄCZNIK
 Architektura po rozdzieleniu panel/mapa (zysk zmierzony: bajty/klatkę 33→17,6 KB [−45%], fps 1,44→2,22 przy tym samym łączu ~50 KB/s, spiki 3× rzadsze):
 - **Mapa**: czysta bitmapa bez panelu, komponent obrazu zwężony o 223 px (`FullImageView` + `NativePanel.PANEL_WIDTH_PX`), JPEG adaptacyjny jak wcześniej.
-- **Panel natywny (lewy pas)**: dystans do manewru w TYTULE stanu (mały setData ~1/s, deduplikowany); zielony blok + Przyjazd/Pozostało jako **PNG w naszym stylu** (`NativePanelRenderer` → `image 134`, wysyłany tylko przy zmianie treści, „Pozostało" ziarno 100 m). Flaga `NativePanel.ENABLED=false` przywraca stary panel w bitmapie.
+- **Panel natywny (lewy pas)**: dystans do manewru w TYTULE stanu (mały setData ~1/s, deduplikowany); zielony blok + Przyjazd/Pozostało jako **PNG w naszym stylu** (`NativePanelRenderer` → `image 134`, wysyłany tylko przy zmianie treści, „Pozostało" ziarno 100 m; `POSITION_X=-paddingLeft` — bez tego PNG chował się pod obrazem mapy). **Przełącznik RUNTIME**: ustawienie `MAP_NATIVE_PANEL` („Panel natywny (mniej BT)" w opcjach mapy w aucie i w telefonie) — OFF przywraca panel w bitmapie; pełne przełączenie po ponownym wejściu w mapę.
 - **Ikony manewrów jak znaki drogowe**: 19 vector drawables `ic_gmap_*` (katalog `ManeuverIcons`), pełne mapowanie manewrów Google + heurystyka zjazdu (keep/ramp + „zjazd" w instrukcji → piktogram zjazdu); rondo C-12 z numerem; nieznany manewr → prosto + log.
-- **Grot pozycji**: okrąg+chevron (styl GMaps), snap wizualny do polilinii trasy (do 35 m, kurs z azymutu segmentu) — kompensuje błąd lateralny GPS auta.
+- **Znacznik pozycji**: wbudowana kropka Google (`isMyLocationEnabled=true`). Własny grot + snap do trasy WYCOFANE po dwóch iteracjach (odklejał się — błąd lateralny GPS auta zmienny, nie stały; nie wracać bez nowego pomysłu).
 - **Timing**: manewr `cur+1`, dystans do `krok[cur].endLocation`; <15 m od końca kroku = manewr wykonany → przełączenie kroku; panel pokazuje się od razu po przeliczeniu trasy; reroute bez zmian (>70 m / 2 odczyty / 10 s).
 - **Instrumentacja `PERF_LOG=true`** (`MapFramePerfLog`): agregaty 2 s do `Android/data/me.hufman.androidautoidrive/files/gmap_perf.csv` (bytes, compress ms, round-trip setData, fps); wyjmowanie przez MTP bez adb; analiza: `analyze.py` (u Pawła na pulpicie/scratchpad).
 Do weryfikacji w jeździe: snap grota, dystans w tytule, prawy margines PNG (26 px), przełączanie kroku na węzłach.
@@ -56,7 +56,7 @@ Do weryfikacji w jeździe: snap grota, dystans w tytule, prawy margines PNG (26 
 Stały debug keystore (SHA-1 `A1:DA:...`, storepass/keypass `android`, alias `androiddebugkey`, base64 w sekrecie `DEBUG_KEYSTORE_BASE64`). Jawny `signingConfig` w `build.gradle` → `../debug.keystore` (NIE domyślna ścieżka AGP `~/.android/` — na runnerze GitHub nie działa, build #8 podpisał złym kluczem). Workflow dekoduje sekret do `$GITHUB_WORKSPACE/debug.keystore`. Stały podpis = instalacja „Aktualizuj" bez odinstalowania + zgodność ze Spotify App Remote.
 
 ## Kolejka
-1. Jazda weryfikacyjna commit a569b55: snap grota, dystans w tytule, margines PNG, przełączanie kroku; CSV → czy fps trzyma ≥2,2 (zły dzień łącza) / ~4–5 (dobry).
+1. Jazda weryfikacyjna commit d2813af: PNG bez przycięcia (fix paddingu), przełącznik panelu w opcjach, kropka Google; CSV → fps (X1 dał 2,43 przy 72 KB/s — najlepszy wynik; G30 typowo ~50 KB/s).
 2. Kosmetyka ikon-znaków ze zdjęć (kształty rysowane „na oko" — iterować jak C-12).
 3. Ostrzejszy JPEG w ruchu (q40) — panel już nie cierpi na kompresji; kolejne −25% bajtów.
 4. Rozstrzygnięcie reżimu łącza: jeśli trafi się dzień latency-bound (~115 KB/s) — prototyp pipeliningu (async setData, cap 2 klatki w locie); w reżimie 50 KB/s pipelining nic nie daje.
