@@ -123,13 +123,8 @@ class GMapsController(private val context: Context,
 		currentLocation = location
 		updateCamera()
 
-		// move the map dot to the new location
+		// move the map dot to the new location (wbudowana kropka Google)
 		gMapLocationSource.onLocationUpdate(location)
-
-		// wlasny grot pozycji obracany wg kursu (mapa north-up);
-		// podczas nawigacji przyklejany wizualnie do trasy (GPS auta ma staly blad boczny)
-		val puckLocation = if (navController.currentNavDestination != null) snapToRouteForPuck(location) else location
-		projection?.updateLocationPuck(puckLocation)
 
 		// aktualizuj panel prowadzenia turn-by-turn (throttlowany do ~1/s)
 		if (navController.currentNavDestination != null) {
@@ -193,7 +188,6 @@ class GMapsController(private val context: Context,
 		mapAppMode.startInteraction(NAVIGATION_MAP_STARTZOOM_TIME + 4000)
 		// clear out previous nav
 		projection?.map?.clear()
-		projection?.resetLocationPuck()
 		// show new nav destination icon
 		navController.navigateTo(dest)
 
@@ -235,7 +229,6 @@ class GMapsController(private val context: Context,
 			val map = projection?.map
 			if (map != null) {
 				map.clear()
-				projection?.resetLocationPuck()   // clear() usunal grot - odtworzymy go nizej
 
 				// destination flag
 				val dest = navController.currentNavDestination
@@ -253,9 +246,6 @@ class GMapsController(private val context: Context,
 				if (currentNavRoute != null) {
 					map.addPolyline(PolylineOptions().color(context.getColor(R.color.mapRouteLine)).addAll(currentNavRoute))
 				}
-
-				// odtworz grot pozycji po map.clear()
-				currentLocation?.let { projection?.updateLocationPuck(it) }
 			}
 		}
 		if (Looper.myLooper() != handler.looper) {
@@ -271,7 +261,7 @@ class GMapsController(private val context: Context,
 	/** Jednolity punkt aktualizacji prowadzenia: panel w bitmapie (flaga off) i/lub pas natywny */
 	private fun pushGuidance(guidance: NavigationGuidance?) {
 		projection?.updateGuidance(guidance)
-		if (!NativePanel.ENABLED) return
+		if (!NativePanel.enabled) return
 		if (guidance == null) {
 			if (lastPanelKey != "") {
 				lastPanelKey = ""
@@ -296,45 +286,6 @@ class GMapsController(private val context: Context,
 	private fun formatNativePanelDistance(m: Double): String {
 		return if (m < 1000) "${(Math.round(m / 10.0) * 10).toInt()} m"
 		else "%.1f km".format(m / 1000.0)
-	}
-
-	/** Przykleja grot do najblizszego punktu polilinii trasy (tylko wizualnie, do 35 m).
-	 *  GPS z auta ma staly blad boczny - surowa pozycja rysowala grot obok drogi.
-	 *  Kurs = azymut segmentu trasy (stabilniejszy niz bearing GPS, zwlaszcza na postoju). */
-	private fun snapToRouteForPuck(location: Location): Location {
-		val route = navController.currentNavRoute ?: return location
-		if (route.size < 2) return location
-		val mPerDegLat = 111320.0
-		val mPerDegLng = 111320.0 * Math.cos(Math.toRadians(location.latitude))
-		var bestD2 = Double.MAX_VALUE
-		var bestLat = 0.0; var bestLng = 0.0
-		var bestA = route[0]; var bestB = route[1]
-		for (i in 0 until route.size - 1) {
-			val a = route[i]; val b = route[i + 1]
-			val ax = (a.longitude - location.longitude) * mPerDegLng
-			val ay = (a.latitude - location.latitude) * mPerDegLat
-			val bx = (b.longitude - location.longitude) * mPerDegLng
-			val by = (b.latitude - location.latitude) * mPerDegLat
-			val dx = bx - ax; val dy = by - ay
-			val len2 = dx * dx + dy * dy
-			val t = if (len2 <= 0.0) 0.0 else ((-ax * dx - ay * dy) / len2).coerceIn(0.0, 1.0)
-			val cx = ax + t * dx; val cy = ay + t * dy
-			val d2 = cx * cx + cy * cy
-			if (d2 < bestD2) {
-				bestD2 = d2
-				bestLat = a.latitude + t * (b.latitude - a.latitude)
-				bestLng = a.longitude + t * (b.longitude - a.longitude)
-				bestA = a; bestB = b
-			}
-		}
-		if (Math.sqrt(bestD2) > 35.0) return location   // daleko od trasy (np. zjazd z niej) - surowy GPS
-		val res = FloatArray(2)
-		Location.distanceBetween(bestA.latitude, bestA.longitude, bestB.latitude, bestB.longitude, res)
-		return Location(location).apply {
-			latitude = bestLat
-			longitude = bestLng
-			bearing = (res[1] + 360f) % 360f
-		}
 	}
 
 	override fun recalcNavigation() {

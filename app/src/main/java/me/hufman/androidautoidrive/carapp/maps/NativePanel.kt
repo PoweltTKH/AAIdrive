@@ -15,11 +15,14 @@ import android.os.Handler
  * Lekcja z buildu testowego: 4 zapisy/s zapychaly kolejke RHMI (kilkanascie sekund opoznienia)
  * -> tu: 1 zapis/s z deduplikacja + rzadki PNG.
  *
- * ENABLED = false przywraca panel w bitmapie (uklad z buildu #9).
+ * enabled = false przywraca panel w bitmapie (uklad z buildu #9).
  */
 object NativePanel {
-	// ====== JEDYNY WLACZNIK ======
-	const val ENABLED = true
+	/** Wlacznik RUNTIME - sterowany ustawieniem MAP_NATIVE_PANEL (przelacznik w opcjach mapy
+	 *  w aucie i w telefonie). Odswiezany w MapAppService.onCarStart i GMapsProjection.applySettings;
+	 *  zmiana w trakcie sesji dziala w pelni po ponownym wejsciu w mape (szerokosc obrazu
+	 *  ustawiana przy fokusie stanu). */
+	@Volatile var enabled = true
 
 	/** Szerokosc lewego pasa oddanego natywnym komponentom (px ekranu auta). */
 	const val PANEL_WIDTH_PX = 223
@@ -46,7 +49,7 @@ object NativePanel {
 
 	/** Dystans do manewru; deduplikacja - bez zmiany wartosci zero ruchu po BT. */
 	fun updateDistance(distance: String) {
-		if (!ENABLED) return
+		if (!enabled) return
 		if (distance == lastDistance) return
 		lastDistance = distance
 		val h = handler ?: return
@@ -62,7 +65,7 @@ object NativePanel {
 
 	/** PNG panelu (zielony blok + Przyjazd/Pozostalo); wolajacy dba o wysylke tylko przy zmianie. */
 	fun updatePanelImage(png: ByteArray) {
-		if (!ENABLED) return
+		if (!enabled) return
 		val h = handler ?: return
 		val s = imageSink ?: return
 		h.post {

@@ -42,7 +42,7 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 
 	// natywny panel: obraz mapy zwezony o lewy pas oddany natywnym komponentom
 	private val nativePanelW: Int
-		get() = if (NativePanel.ENABLED) NativePanel.PANEL_WIDTH_PX else 0
+		get() = if (NativePanel.enabled) NativePanel.PANEL_WIDTH_PX else 0
 
 	fun initWidgets() {
 		// set up the components on the map

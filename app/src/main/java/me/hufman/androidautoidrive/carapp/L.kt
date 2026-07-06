@@ -161,6 +161,7 @@ object L {
 	val MAP_SATELLITE by StringResourceDelegate("Show satellite imagery")
 	val MAP_TRAFFIC by StringResourceDelegate("Show traffic")
 	val MAP_BUILDINGS by StringResourceDelegate("Show 3D buildings")
+	val MAP_NATIVE_PANEL by StringResourceDelegate("Native nav panel (less BT)")
 	val MAP_TILT by StringResourceDelegate("Tilt map")
 	val MAP_CUSTOM_STYLE by StringResourceDelegate("Use custom map style")
 

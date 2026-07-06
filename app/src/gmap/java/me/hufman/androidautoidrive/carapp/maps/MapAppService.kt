@@ -28,6 +28,8 @@ class MapAppService: CarAppService() {
 	override fun onCarStart() {
 		Log.i(MainService.TAG, "Starting GMaps")
 		MapFramePerfLog.init(applicationContext)   // PERF: instrumentacja pipeline'u klatek (wyl. flaga PERF_LOG)
+		// tryb panelu z ustawien (przelacznik "Panel natywny" w opcjach mapy)
+		NativePanel.enabled = appSettings[AppSettings.KEYS.MAP_NATIVE_PANEL].toBoolean()
 		val cdsData = CDSDataProvider()
 		cdsData.setConnection(CarInformation.cdsData.asConnection(cdsData))
 		val carLocationProvider = CdsLocationProvider(cdsData, false)

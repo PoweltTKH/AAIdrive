@@ -3,12 +3,7 @@ package me.hufman.androidautoidrive.carapp.maps
 import android.annotation.SuppressLint
 import android.app.Presentation
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Point
-import android.location.Location
 import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -23,12 +18,7 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.OnMapsSdkInitializedCallback
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
 import io.bimmergestalt.idriveconnectkit.SidebarRHMIDimensions
 import io.bimmergestalt.idriveconnectkit.SubsetRHMIDimensions
 import me.hufman.androidautoidrive.*
@@ -50,10 +40,6 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private var navEta: TextView? = null
 	private var navRemaining: TextView? = null
 
-	// wlasny znacznik pozycji (grot obracany wg location.bearing) zamiast wbudowanej kropki
-	private var locationPuck: Marker? = null
-	private var puckIcon: BitmapDescriptor? = null
-
 	val fullDimensions = display.run {
 		val small = Point()
 		val dimension = Point()
@@ -74,7 +60,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private val splitMarginPx: Int
 		get() {
 			var m = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
-			if (NativePanel.ENABLED) m += NativePanel.PANEL_WIDTH_PX / 2
+			if (NativePanel.enabled) m += NativePanel.PANEL_WIDTH_PX / 2
 			return m
 		}
 
@@ -106,8 +92,9 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			applySettings()
 
 			map.setLocationSource(locationSource)
-			// wbudowana kropka wylaczona - rysujemy wlasny grot obracany wg kursu (updateLocationPuck)
-			map.isMyLocationEnabled = false
+			// wbudowana kropka pozycji Google - wlasny grot i snap do trasy wycofane
+			// (dwie iteracje odklejaly sie od trasy przez blad lateralny GPS auta)
+			map.isMyLocationEnabled = true
 
 			map.isIndoorEnabled = false
 
@@ -134,7 +121,7 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 
 	/** Aktualizuje panel prowadzenia; null = ukryj (brak nawigacji) */
 	fun updateGuidance(g: NavigationGuidance?) {
-		if (NativePanel.ENABLED) {
+		if (NativePanel.enabled) {
 			// panel w bitmapie wylaczony - dane prowadzenia ida natywnym pasem RHMI
 			// (NativePanel/NativePanelRenderer), a klatki mapy sa o pas panelu mniejsze
 			navPanel?.visibility = View.GONE
@@ -162,60 +149,6 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private fun formatEta(epochMillis: Long): String {
 		val sdf = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
 		return sdf.format(Date(epochMillis))
-	}
-
-	/** Aktualizuje wlasny grot pozycji: pozycja + obrot wg kursu. Mapa zostaje north-up, obraca sie sam sprite. */
-	fun updateLocationPuck(location: Location) {
-		val map = this.map ?: return
-		val pos = LatLng(location.latitude, location.longitude)
-		val rot = if (location.hasBearing()) location.bearing else (locationPuck?.rotation ?: 0f)
-		val puck = locationPuck
-		if (puck == null) {
-			val icon = puckIcon ?: buildLocationPuck().also { puckIcon = it }
-			locationPuck = map.addMarker(MarkerOptions()
-					.position(pos)
-					.icon(icon)
-					// glif jest teraz symetryczny wokol srodka bitmapy (okrag + chevron),
-					// wiec anchor 0.5/0.5 jest jednoznaczny; jesli grot NADAL odsuniety od trasy,
-					// to blad lateralny GPS z auta (CDS), nie geometria - wtedy: snap do polilinii
-					.anchor(0.5f, 0.5f)
-					.flat(true)           // lezy na mapie -> rotation == kurs geograficzny
-					.rotation(rot)
-					.zIndex(1000f))
-		} else {
-			puck.position = pos
-			puck.rotation = rot
-		}
-	}
-
-	/** Po map.clear() marker jest juz usuniety - kasujemy referencje, by przy nastepnym fixie odtworzyc grot. */
-	fun resetLocationPuck() {
-		locationPuck = null
-	}
-
-	/** Grot pozycji w stylu GMaps: niebieski okrag z bialym pierscieniem + bialy chevron kursu.
-	 *  Symetryczny wokol srodka bitmapy -> wizualny srodek == pozycja GPS, bez niejednoznacznosci anchora. */
-	private fun buildLocationPuck(): BitmapDescriptor {
-		val s = 64
-		val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-		val c = Canvas(bmp)
-		val cx = s / 2f; val cy = s / 2f; val r = s * 0.30f
-		val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1A73E8.toInt(); style = Paint.Style.FILL }
-		val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = s * 0.06f
-		}
-		val chevron = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
-		c.drawCircle(cx, cy, r, fill)
-		c.drawCircle(cx, cy, r, ring)
-		val path = Path().apply {
-			moveTo(cx, cy - r * 0.62f)                  // czubek chevronu (kurs)
-			lineTo(cx - r * 0.52f, cy + r * 0.45f)
-			lineTo(cx, cy + r * 0.12f)                  // wciecie
-			lineTo(cx + r * 0.52f, cy + r * 0.45f)
-			close()
-		}
-		c.drawPath(path, chevron)
-		return BitmapDescriptorFactory.fromBitmap(bmp)
 	}
 
 	/** Etykieta ronda: ikona w stylu znaku C-12 (vector drawable, biale strzalki w okregu) + numer zjazdu obok. */
@@ -251,13 +184,17 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	}
 
 	fun applySettings() {
+		// przelacznik panelu natywnego (opcje mapy w aucie/telefonie); pelne przelaczenie
+		// szerokosci obrazu nastapi przy nastepnym wejsciu w mape (fokus stanu)
+		NativePanel.enabled = appSettings[AppSettings.KEYS.MAP_NATIVE_PANEL].toBoolean()
+
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
 		val margin = splitMarginPx
 		// panel natywny: caly kadr to mapa (panel poza bitmapa) -> symetryczny padding;
 		// panel w bitmapie: lewy padding powiekszony o panel, zeby pozycja centrowala sie
 		// w widocznym obszarze NA PRAWO od panelu
-		val leftPad = if (NativePanel.ENABLED) margin else margin + panelWidthPx
+		val leftPad = if (NativePanel.enabled) margin else margin + panelWidthPx
 		map?.setPadding(leftPad, 0, margin, 0)
 		// panel tez musi sie dopasowac do biezacego trybu (full/split)
 		layoutNavPanel()

@@ -110,10 +110,10 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		carConnection.rhmi_addActionEventHandler(rhmiHandle, "me.hufman.androidautoidrive.mapview", -1)
 		carConnection.rhmi_addHmiEventHandler(rhmiHandle, "me.hufman.androidautoidrive.mapview", -1, -1)
 
-		// natywny panel prowadzenia w lewym pasie (image 134 + labelka dystansu); patrz NativePanel
-		if (NativePanel.ENABLED) {
-			initNativePanel()
-		}
+		// natywny panel prowadzenia w lewym pasie (image 134 + dystans w tytule); patrz NativePanel.
+		// Inicjalizacja bezwarunkowa - wlacznik jest runtime (ustawienie MAP_NATIVE_PANEL),
+		// a przy wylaczonym panelu komponenty i tak przykrywa pelnoekranowy obraz mapy.
+		initNativePanel()
 	}
 
 	/** Ustawia natywne komponenty stanu mapy jako panel prowadzenia w lewym pasie */
@@ -128,9 +128,11 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		}
 
 		// dystans do manewru idzie w TYTUL stanu (gorny pasek, zamiast "Map") - patrz distanceSink;
-		// labelki zostaja ukryte, a zielony blok (PNG) siedzi od razu pod tytulem - jak w starym panelu
+		// labelki zostaja ukryte, a zielony blok (PNG) siedzi od razu pod tytulem - jak w starym panelu.
+		// POSITION_X = -paddingLeft: uklad RHMI dodaje padding do pozycji - bez tej korekty PNG
+		// byl przesuniety w prawo i jego prawa czesc chowala sie pod obrazem mapy (przyciete teksty)
 		extraImage?.apply {
-			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 0)
+			setProperty(RHMIProperty.PropertyId.POSITION_X.id, -mapAppMode.rhmiDimensions.paddingLeft)
 			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 50)
 			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
 			setProperty(RHMIProperty.PropertyId.HEIGHT.id, 360)
@@ -142,24 +144,21 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		Log.i(TAG, "Setting up map transfer")
 		frameUpdater.start(handler)
 
-		// natywny panel: zapisy modeli RHMI na watku car (deduplikowany dystans + rzadki PNG)
-		if (NativePanel.ENABLED) {
-			val extraImage = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Image>().drop(1).firstOrNull()
-			NativePanel.attach(handler,
-					distanceSink = { distance ->
-						// dystans w tytule stanu (gorny pasek); poza nawigacja wraca "Map"
-						fullImageView.state.getTextModel()?.asRaDataModel()?.value =
-								if (distance.isBlank()) "Map" else distance
-					},
-					imageSink = { png ->
-						(extraImage?.getModel() as? RHMIModel.RaImageModel)?.value = png
-					})
-		}
+		// natywny panel: zapisy modeli RHMI na watku car (deduplikowany dystans + rzadki PNG);
+		// podpiecie bezwarunkowe - dane plyna tylko gdy NativePanel.enabled (kontrola w update*)
+		val extraImage = fullImageView.state.componentsList.filterIsInstance<RHMIComponent.Image>().drop(1).firstOrNull()
+		NativePanel.attach(handler,
+				distanceSink = { distance ->
+					// dystans w tytule stanu (gorny pasek); poza nawigacja wraca "Map"
+					fullImageView.state.getTextModel()?.asRaDataModel()?.value =
+							if (distance.isBlank()) "Map" else distance
+				},
+				imageSink = { png ->
+					(extraImage?.getModel() as? RHMIModel.RaImageModel)?.value = png
+				})
 	}
 	fun onDestroy() {
-		if (NativePanel.ENABLED) {
-			NativePanel.detach()
-		}
+		NativePanel.detach()
 		frameUpdater.shutDown()
 		mapAppMode.appSettings.callback = null
 	}
