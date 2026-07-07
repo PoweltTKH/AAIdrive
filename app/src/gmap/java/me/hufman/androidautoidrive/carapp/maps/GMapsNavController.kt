@@ -66,6 +66,10 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 	private var offRouteCount: Int = 0
 	private var lastRerouteTimeMs: Long = 0L
 
+	// wspolczynnik ruchu drogowego: duration_in_traffic / duration z momentu wyznaczenia trasy;
+	// statyczne czasy krokow mnozymy przez niego, zeby ETA odpowiadalo realnemu ruchowi
+	private var trafficFactor: Double = 1.0
+
 	fun navigateTo(dest: LatLong) {
 		currentNavDestination = dest
 
@@ -80,6 +84,7 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		stepPaths = emptyList()
 		currentStepIndex = 0
 		offRouteCount = 0
+		trafficFactor = 1.0
 		callback(this)
 	}
 
@@ -91,6 +96,8 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		val directionsRequest = DirectionsApi.newRequest(geoClient)
 				.mode(TravelMode.DRIVING)
 				.language("pl")
+				// trasa swiadoma biezacego ruchu + duration_in_traffic w odpowiedzi (realne ETA)
+				.departureTime(org.joda.time.DateTime.now())
 				.origin(origin)
 				.destination(routeDest)
 		directionsRequest.setCallback(object: PendingResult.Callback<DirectionsResult> {
@@ -110,6 +117,15 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				}
 				steps = newSteps
 				stepPaths = newStepPaths
+				// wspolczynnik ruchu: ile realny czas (z korkami) jest dluzszy od statycznego
+				var staticSec = 0L
+				var trafficSec = 0L
+				route.legs.forEach { leg ->
+					val s = leg.duration?.inSeconds ?: 0L
+					staticSec += s
+					trafficSec += leg.durationInTraffic?.inSeconds ?: s
+				}
+				trafficFactor = if (staticSec > 0) trafficSec.toDouble() / staticSec else 1.0
 				// linia trasy do narysowania = sklejone detaliczne odcinki krokow
 				currentNavRoute = newStepPaths.flatten()
 				currentStepIndex = 0
@@ -171,12 +187,12 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 		for (i in (currentStepIndex + 1) until steps.size) {
 			remaining += steps[i].distance.inMeters.toDouble()
 		}
-		// pozostaly czas do celu
+		// pozostaly czas do celu (statyczne czasy krokow skalowane wspolczynnikiem ruchu)
 		var remainingSec = 0L
 		for (i in currentStepIndex until steps.size) {
 			remainingSec += steps[i].duration.inSeconds
 		}
-		val eta = System.currentTimeMillis() + remainingSec * 1000L
+		val eta = System.currentTimeMillis() + (remainingSec * trafficFactor * 1000.0).toLong()
 
 		// WAZNE: pokazujemy NADCHODZACY manewr (z nastepnego kroku), nie ten juz wykonany.
 		// W danych Google instrukcja opisuje manewr na POCZATKU kroku, wiec nastepny zakret

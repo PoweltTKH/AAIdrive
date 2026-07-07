@@ -129,13 +129,14 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 
 		// dystans do manewru idzie w TYTUL stanu (gorny pasek, zamiast "Map") - patrz distanceSink;
 		// labelki zostaja ukryte, a zielony blok (PNG) siedzi od razu pod tytulem - jak w starym panelu.
-		// POSITION_X = -paddingLeft: uklad RHMI dodaje padding do pozycji - bez tej korekty PNG
-		// byl przesuniety w prawo i jego prawa czesc chowala sie pod obrazem mapy (przyciete teksty)
+		// POSITION_X/Y = -padding + docelowa pozycja ekranowa: uklad RHMI dodaje padding wymiarow
+		// do pozycji - bez korekty PNG mial "marginesy" (przesuniety w prawo i w dol, prawa czesc
+		// chowala sie pod obrazem mapy)
 		extraImage?.apply {
 			setProperty(RHMIProperty.PropertyId.POSITION_X.id, -mapAppMode.rhmiDimensions.paddingLeft)
-			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 50)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -mapAppMode.rhmiDimensions.paddingTop + 44)
 			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
-			setProperty(RHMIProperty.PropertyId.HEIGHT.id, 360)
+			setProperty(RHMIProperty.PropertyId.HEIGHT.id, NativePanel.PANEL_HEIGHT_PX)
 			setVisible(true)
 		}
 	}

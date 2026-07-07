@@ -27,6 +27,10 @@ object NativePanel {
 	/** Szerokosc lewego pasa oddanego natywnym komponentom (px ekranu auta). */
 	const val PANEL_WIDTH_PX = 223
 
+	/** Wysokosc PNG panelu (px): zielony blok u samej gory + przerwa na natywna strzalke BMW
+	 *  + sekcja Przyjazd/Pozostalo na dole. */
+	const val PANEL_HEIGHT_PX = 432
+
 	@Volatile private var handler: Handler? = null
 	@Volatile private var distanceSink: ((String) -> Unit)? = null
 	@Volatile private var imageSink: ((ByteArray) -> Unit)? = null

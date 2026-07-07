@@ -23,7 +23,7 @@ import java.util.Locale
  */
 object NativePanelRenderer {
 	const val W = NativePanel.PANEL_WIDTH_PX
-	const val H = 360
+	const val H = NativePanel.PANEL_HEIGHT_PX
 
 	/** Prawa krawedz pasa bywa przykryta obrazem mapy (padding wymiarow RHMI) -
 	 *  tresc PNG konczy sie wczesniej, zeby nic nie bylo przyciete. */
@@ -65,7 +65,8 @@ object NativePanelRenderer {
 		layout.draw(c)
 		c.restore()
 
-		// Przyjazd / Pozostalo (styl jak w dotychczasowym panelu)
+		// Przyjazd / Pozostalo (styl jak w dotychczasowym panelu) - PONIZEJ strefy natywnej
+		// pomaranczowej strzalki BMW (PNG-lokalnie ~176..290 zostaje ciemna przerwa na strzalke)
 		val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9AA0A6.toInt(); textSize = 17f }
 		val valBig = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 40f; isFakeBoldText = true
@@ -73,10 +74,10 @@ object NativePanelRenderer {
 		val valMed = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 31f; isFakeBoldText = true
 		}
-		c.drawText("Przyjazd", 14f, 220f, cap)
-		c.drawText(formatEta(g.etaEpochMillis), 14f, 262f, valBig)
-		c.drawText("Pozostało", 14f, 304f, cap)
-		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 340f, valMed)
+		c.drawText("Przyjazd", 14f, 306f, cap)
+		c.drawText(formatEta(g.etaEpochMillis), 14f, 348f, valBig)
+		c.drawText("Pozostało", 14f, 390f, cap)
+		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 424f, valMed)
 
 		return png(bmp)
 	}
