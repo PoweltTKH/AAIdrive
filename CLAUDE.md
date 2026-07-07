@@ -32,7 +32,7 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
 - Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
 
-## Stan bieżący — commit d2813af (wersja 1.4.3-75) — NATYWNY PANEL + PRZEŁĄCZNIK
+## Stan bieżący — commit c6c0364 (wersja 1.4.3-78) — NATYWNY PANEL + TRYBY WIDOKU + ETA Z RUCHEM
 Architektura po rozdzieleniu panel/mapa (zysk zmierzony: bajty/klatkę 33→17,6 KB [−45%], fps 1,44→2,22 przy tym samym łączu ~50 KB/s, spiki 3× rzadsze):
 - **Mapa**: czysta bitmapa bez panelu, komponent obrazu zwężony o 223 px (`FullImageView` + `NativePanel.PANEL_WIDTH_PX`), JPEG adaptacyjny jak wcześniej.
 - **Panel natywny (lewy pas)**: dystans do manewru w TYTULE stanu (mały setData ~1/s, deduplikowany); zielony blok + Przyjazd/Pozostało jako **PNG w naszym stylu** (`NativePanelRenderer` → `image 134`, wysyłany tylko przy zmianie treści, „Pozostało" ziarno 100 m; `POSITION_X=-paddingLeft` — bez tego PNG chował się pod obrazem mapy). **Przełącznik RUNTIME**: ustawienie `MAP_NATIVE_PANEL` („Panel natywny (mniej BT)" w opcjach mapy w aucie i w telefonie) — OFF przywraca panel w bitmapie; pełne przełączenie po ponownym wejściu w mapę.
@@ -56,10 +56,14 @@ Do weryfikacji w jeździe: snap grota, dystans w tytule, prawy margines PNG (26 
 Stały debug keystore (SHA-1 `A1:DA:...`, storepass/keypass `android`, alias `androiddebugkey`, base64 w sekrecie `DEBUG_KEYSTORE_BASE64`). Jawny `signingConfig` w `build.gradle` → `../debug.keystore` (NIE domyślna ścieżka AGP `~/.android/` — na runnerze GitHub nie działa, build #8 podpisał złym kluczem). Workflow dekoduje sekret do `$GITHUB_WORKSPACE/debug.keystore`. Stały podpis = instalacja „Aktualizuj" bez odinstalowania + zgodność ze Spotify App Remote.
 
 ## Kolejka
-1. Jazda weryfikacyjna commit d2813af: PNG bez przycięcia (fix paddingu), przełącznik panelu w opcjach, kropka Google; CSV → fps (X1 dał 2,43 przy 72 KB/s — najlepszy wynik; G30 typowo ~50 KB/s).
-2. Kosmetyka ikon-znaków ze zdjęć (kształty rysowane „na oko" — iterować jak C-12).
-3. Ostrzejszy JPEG w ruchu (q40) — panel już nie cierpi na kompresji; kolejne −25% bajtów.
-4. Rozstrzygnięcie reżimu łącza: jeśli trafi się dzień latency-bound (~115 KB/s) — prototyp pipeliningu (async setData, cap 2 klatki w locie); w reżimie 50 KB/s pipelining nic nie daje.
-5. Build C — widok 3D / za samochodem: tilt + heading-up z `location.bearing`, jako przełączniki. Kompromis: więcej zmian klatki = gorsza kompresja po BT.
-6. Drobne — `departure_time=now` w Directions (trasa świadoma ruchu + realniejsze ETA).
+1. Jazda weryfikacyjna commit c6c0364 (1.4.3-78): panel v3 (flush przez -paddingTop, przerwa ~110 px na strzałkę BMW), ETA z ruchem (`departure_time=now`, `trafficFactor`), pineska płaska na końcu trasy, `gmap_crash.log` (diagnoza crasha BT z X1).
+2. Ostatnie cele + „Wznów: [cel]" w menu (kontynuacja nawigacji po postoju) — obiecane, następny build.
+3. Kosmetyka ikon-znaków ze zdjęć (kształty rysowane „na oko" — iterować jak C-12).
+4. Ostrzejszy JPEG w ruchu (q40) — panel już nie cierpi na kompresji; kolejne −25% bajtów.
+5. Rozstrzygnięcie reżimu łącza: pipelining tylko jeśli trafi się dzień latency-bound (~115 KB/s); reżimy zmienne w OBU autach (X1 raz 72, raz 45 KB/s).
+6. Obserwacja: „świrowanie" Google Maps na telefonie przy działającej nawigacji (brak związku technicznego — zweryfikować, czy się powtarza), jednorazowy reroute bocznymi drogami.
 7. Po zakończeniu strojenia: `PERF_LOG=false` (albo zostawić — koszt pomijalny).
+
+## Ustalenia z jazd (tryby widoku)
+- Obrót mapy (2D+obrót) ≈ zero kosztu w bajtach (18,6 vs 17,6 KB/klatkę) — preferowany tryb Pawła.
+- 3D (tilt) zauważalnie tnie przy słabym łączu — zostaje jako opcja.
