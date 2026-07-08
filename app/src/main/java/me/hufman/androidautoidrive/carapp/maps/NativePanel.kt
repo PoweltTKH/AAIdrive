@@ -29,7 +29,7 @@ object NativePanel {
 
 	/** Wysokosc PNG panelu (px): zielony blok u samej gory + przerwa na natywna strzalke BMW
 	 *  + sekcja Przyjazd/Pozostalo na dole. */
-	const val PANEL_HEIGHT_PX = 432
+	const val PANEL_HEIGHT_PX = 420
 
 	@Volatile private var handler: Handler? = null
 	@Volatile private var distanceSink: ((String) -> Unit)? = null

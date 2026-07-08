@@ -251,7 +251,8 @@ class GMapsController(private val context: Context,
 				map.clear()
 
 				// destination flag: pineska na KONCU polilinii trasy (zawsze na drodze, nie na
-				// geokodzie celu) i PLASKA - domyslny billboard "fruwal" przy pochyleniu/obrocie kamery
+				// geokodzie celu). Stojacy billboard (domyslny) - flat(true) kladl pineske na mapie
+				// i przy obrocie kamery wygladala jak lewitujaca obok konca trasy
 				val dest = navController.currentNavDestination
 				if (dest != null) {
 					val destPos = navController.currentNavRoute?.lastOrNull()
@@ -259,8 +260,6 @@ class GMapsController(private val context: Context,
 					val marker = MarkerOptions()
 							.position(destPos)
 							.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
-							.flat(true)
-							.anchor(0.5f, 1.0f)
 							.visible(true)
 					map.addMarker(marker)
 				}

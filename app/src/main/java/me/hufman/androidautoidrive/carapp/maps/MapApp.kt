@@ -134,7 +134,7 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 		// chowala sie pod obrazem mapy)
 		extraImage?.apply {
 			setProperty(RHMIProperty.PropertyId.POSITION_X.id, -mapAppMode.rhmiDimensions.paddingLeft)
-			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -mapAppMode.rhmiDimensions.paddingTop + 44)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -mapAppMode.rhmiDimensions.paddingTop + 56)
 			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
 			setProperty(RHMIProperty.PropertyId.HEIGHT.id, NativePanel.PANEL_HEIGHT_PX)
 			setVisible(true)
