@@ -12,10 +12,13 @@ import me.hufman.androidautoidrive.carapp.maps.FrameUpdater
 import me.hufman.androidautoidrive.carapp.maps.MapAppMode
 import me.hufman.androidautoidrive.carapp.maps.MapInteractionController
 import me.hufman.androidautoidrive.maps.MapPlaceSearch
+import me.hufman.androidautoidrive.utils.truncate
 
 class MenuView(val state: RHMIState, val interaction: MapInteractionController, val mapPlaceSearch: MapPlaceSearch, val frameUpdater: FrameUpdater, val mapAppMode: MapAppMode) {
 	companion object {
 		val TAG = "MapMenu"
+		// maksymalny wiek ostatniego celu do zaproponowania "Wznow" (48 h)
+		const val RESUME_MAX_AGE_MS = 48 * 60 * 60 * 1000L
 		fun fits(state: RHMIState): Boolean {
 			return state is RHMIState.PlainState &&
 				state.componentsList.filterIsInstance<RHMIComponent.Label>().isNotEmpty() &&   // show whether currently navigating
@@ -34,7 +37,9 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 	val labelDestinations: RHMIComponent.Label
 	val menuDestinations = state.componentsList.filterIsInstance<RHMIComponent.List>()[2]
 	val destinationEntries = StoredList(mapAppMode.appSettings, AppSettings.KEYS.MAP_QUICK_DESTINATIONS)
-	val rhmiDestinationEntries = object: RHMIModel.RaListModel.RHMIListAdapter<String>(3, destinationEntries) {}
+	// lista w menu = ostatnie cele (historia) + szybkie cele z ustawien, bez duplikatow
+	val combinedDestinations = ArrayList<String>()
+	val rhmiDestinationEntries = object: RHMIModel.RaListModel.RHMIListAdapter<String>(3, combinedDestinations) {}
 
 	val labelSettings: RHMIComponent.Label
 	val menuSettings = state.componentsList.filterIsInstance<RHMIComponent.List>()[3]
@@ -64,6 +69,7 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 		state.focusCallback = FocusCallback { focused ->
 			if (focused) {
 				redrawCommands()
+				redrawDestinations()
 				Log.i(TAG, "Showing map on menu")
 				frameUpdater.showWindow(350, 90, mapModel)
 			} else {
@@ -79,24 +85,36 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 
 		menuList.setProperty(RHMIProperty.PropertyId.LIST_COLUMNWIDTH.id, "100,0,*")
 		menuList.setVisible(true)
+		// wpisy rozpoznawane po TRESCI (nie po indeksie), bo lista jest dynamiczna:
+		// [Zobacz mape, Szukaj] + ("Wznow: cel" poza nawigacja | Przelicz/Wyczysc w trakcie)
 		menuList.getAction()?.asRAAction()?.rhmiActionCallback = RHMIActionListCallback { listIndex ->
-			val destStateId = when (listIndex) {
-				0 -> stateMap.id    // must be index 0, because it's also index 0 in menuMap
-				1 -> stateInput.id
+			val entry = menuEntries.getOrNull(listIndex)
+			val isResume = entry?.startsWith("${L.MAP_RESUME}:") == true
+			val destStateId = when {
+				entry == L.MAP_ACTION_VIEWMAP -> stateMap.id    // must be index 0, because it's also index 0 in menuMap
+				entry == L.MAP_ACTION_SEARCH -> stateInput.id
+				isResume -> stateMap.id
 				else -> state.id
 			}
-			Log.i(TAG, "User pressed menu item $listIndex ${menuEntries.getOrNull(listIndex)}, setting target ${menuList.getAction()?.asHMIAction()?.getTargetModel()?.id} to $destStateId")
+			Log.i(TAG, "User pressed menu item $listIndex $entry, setting target ${menuList.getAction()?.asHMIAction()?.getTargetModel()?.id} to $destStateId")
 			menuList.getAction()?.asHMIAction()?.getTargetModel()?.asRaIntModel()?.value = destStateId
-			if (listIndex== 2) {
-				// recalculate nav
+			if (entry == L.MAP_ACTION_RECALC_NAV) {
 				interaction.recalcNavigation()
 			}
-			if (listIndex == 3) {
-				// clear navigation
+			if (entry == L.MAP_ACTION_CLEARNAV) {
 				interaction.stopNavigation()
 				// the interaction is async, but we trust that it will clear the destination so we can redraw to hide the commands
 				mapAppMode.currentNavDestination = null
 				redrawCommands()
+			}
+			if (isResume) {
+				// kontynuacja nawigacji do ostatniego celu (np. po postoju na stacji)
+				val last = mapAppMode.getLastDestination()
+				if (last != null) {
+					interaction.navigateTo(last.location)
+				} else {
+					throw RHMIActionAbort()
+				}
 			}
 		}
 		// it seems that menuMap and menuList share the same HMI Action values, so use the same RA handler
@@ -107,7 +125,7 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 		menuDestinations.setVisible(true)
 		menuDestinations.getAction()?.asRAAction()?.rhmiActionCallback = RHMIActionListCallback { listIndex ->
 			runBlocking {
-				val destination = destinationEntries.getOrNull(listIndex)?.let {
+				val destination = combinedDestinations.getOrNull(listIndex)?.let {
 					mapPlaceSearch.searchLocationsAsync(it).await().getOrNull(0)
 				}
 				val locationResult = if (destination != null && destination.location == null) {
@@ -118,6 +136,8 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 				if (locationResult?.location == null) {
 					throw RHMIActionAbort()
 				}
+				// historia celow + ostatni cel do wznowienia
+				mapAppMode.recordDestination(locationResult.name, locationResult.location)
 				menuDestinations.getAction()?.asHMIAction()?.getTargetModel()?.asRaIntModel()?.value = stateMap.id
 				interaction.navigateTo(locationResult.location)
 			}
@@ -135,12 +155,25 @@ class MenuView(val state: RHMIState, val interaction: MapInteractionController, 
 		menuEntries.addAll(alwaysMenuEntries)
 		if (mapAppMode.currentNavDestination != null) {
 			menuEntries.addAll(duringNavMenuEntries)
+		} else {
+			// poza nawigacja: zaproponuj wznowienie ostatniego celu (kontynuacja po postoju)
+			val last = mapAppMode.getLastDestination()
+			if (last != null && System.currentTimeMillis() - last.time < RESUME_MAX_AGE_MS) {
+				menuEntries.add("${L.MAP_RESUME}: ${last.name.truncate(18)}")
+			}
 		}
 		menuList.getModel()?.value = rhmiMenuEntries
 	}
 
 	private fun redrawDestinations() {
-		labelDestinations.setVisible(rhmiDestinationEntries.height > 0)
+		combinedDestinations.clear()
+		mapAppMode.getRecentDestinations().forEach {
+			if (!combinedDestinations.contains(it)) combinedDestinations.add(it)
+		}
+		destinationEntries.getAll().forEach {
+			if (!combinedDestinations.contains(it)) combinedDestinations.add(it)
+		}
+		labelDestinations.setVisible(combinedDestinations.isNotEmpty())
 		menuDestinations.getModel()?.value = rhmiDestinationEntries
 	}
 }

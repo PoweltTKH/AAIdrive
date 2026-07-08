@@ -400,6 +400,7 @@
     <string name="MAP_BUILDINGS">Włącz budynki 3D</string>
     <string name="MAP_NATIVE_PANEL">Panel natywny (mniej BT)</string>
     <string name="MAP_ROTATE">Obrót w kierunku jazdy</string>
+    <string name="MAP_RESUME">Wznów</string>
     <string name="MAP_TILT">Pochylenie mapy</string>
     <string name="MAP_CUSTOM_STYLE">Użyj niestandardowego stylu mapy</string>
     <string name="MUSIC_APPLIST_TITLE">Aplikacje</string>

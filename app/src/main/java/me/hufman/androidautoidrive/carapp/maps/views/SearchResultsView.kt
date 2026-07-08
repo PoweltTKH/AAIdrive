@@ -126,6 +126,8 @@ class SearchResultsView(val state: RHMIState, val mapPlaceSearch: MapPlaceSearch
 				result
 			}
 			if (locationResult?.location != null) {
+				// historia celow + ostatni cel do wznowienia
+				mapAppMode.recordDestination(locationResult.name, locationResult.location)
 				interaction.navigateTo(locationResult.location)
 				// HMIAction is set up already
 			}

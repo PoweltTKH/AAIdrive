@@ -3,6 +3,7 @@ package me.hufman.androidautoidrive.carapp.maps
 import android.graphics.Bitmap
 import androidx.lifecycle.MutableLiveData
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import io.bimmergestalt.idriveconnectkit.CDS
 import io.bimmergestalt.idriveconnectkit.CDSProperty
 import io.bimmergestalt.idriveconnectkit.RHMIDimensions
@@ -10,6 +11,7 @@ import io.bimmergestalt.idriveconnectkit.SidebarRHMIDimensions
 import me.hufman.androidautoidrive.AppSettings
 import me.hufman.androidautoidrive.BuildConfig
 import me.hufman.androidautoidrive.MutableAppSettingsObserver
+import me.hufman.androidautoidrive.StoredList
 import me.hufman.androidautoidrive.carapp.FullImageConfig
 import me.hufman.androidautoidrive.carapp.music.MusicAppMode
 import me.hufman.androidautoidrive.cds.CDSData
@@ -51,6 +53,9 @@ class MapAppMode(val fullDimensions: RHMIDimensions,
                  val cdsData: CDSData,
                  val screenCaptureConfig: DynamicScreenCaptureConfig): FullImageConfig, ScreenCaptureConfig by screenCaptureConfig {
 	companion object {
+		// ile ostatnich celow trzymamy w historii menu
+		const val RECENT_DESTINATIONS_MAX = 4
+
 		// whether the custom map is currently navigating somewhere
 		private var currentNavDestination: LatLong? = null
 			set(value) {
@@ -116,5 +121,39 @@ class MapAppMode(val fullDimensions: RHMIDimensions,
 	// screen capture quality adjustment
 	fun startInteraction(timeoutMs: Int = DynamicScreenCaptureConfig.RECENT_INTERACTION_THRESHOLD) {
 		screenCaptureConfig.startInteraction(timeoutMs)
+	}
+
+	// ===== historia celow + ostatni cel (kontynuacja nawigacji po postoju) =====
+
+	data class LastDestination(val name: String, val location: LatLong, val time: Long)
+
+	private val recentDestinations = StoredList(appSettings, AppSettings.KEYS.MAP_RECENT_DESTINATIONS)
+
+	/** Zapisuje cel po skutecznym wyborze (nazwa do historii w menu + ostatni cel do wznowienia) */
+	fun recordDestination(name: String, location: LatLong) {
+		if (name.isNotBlank()) {
+			recentDestinations.withList {
+				remove(name)
+				add(0, name)
+				while (size > RECENT_DESTINATIONS_MAX) removeAt(size - 1)
+			}
+		}
+		appSettings[AppSettings.KEYS.MAP_LAST_DESTINATION] = JsonObject().apply {
+			addProperty("name", name)
+			addProperty("lat", location.latitude)
+			addProperty("lng", location.longitude)
+			addProperty("time", System.currentTimeMillis())
+		}.toString()
+	}
+
+	fun getRecentDestinations(): List<String> = recentDestinations.getAll()
+
+	fun getLastDestination(): LastDestination? {
+		return try {
+			val o = JsonParser.parseString(appSettings[AppSettings.KEYS.MAP_LAST_DESTINATION]).asJsonObject
+			LastDestination(o["name"].asString, LatLong(o["lat"].asDouble, o["lng"].asDouble), o["time"].asLong)
+		} catch (e: Exception) {
+			null
+		}
 	}
 }

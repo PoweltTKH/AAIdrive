@@ -7,12 +7,13 @@ import me.hufman.androidautoidrive.CarThreadExceptionHandler
 import me.hufman.androidautoidrive.carapp.FullImageView
 import me.hufman.androidautoidrive.carapp.InputState
 import me.hufman.androidautoidrive.carapp.L
+import me.hufman.androidautoidrive.carapp.maps.MapAppMode
 import me.hufman.androidautoidrive.carapp.maps.MapInteractionController
 import me.hufman.androidautoidrive.maps.MapResult
 import me.hufman.androidautoidrive.maps.MapPlaceSearch
 import kotlin.coroutines.CoroutineContext
 
-class PlaceSearchView(state: RHMIState, val mapPlaceSearch: MapPlaceSearch, val interaction: MapInteractionController): InputState<MapResult>(state), CoroutineScope {
+class PlaceSearchView(state: RHMIState, val mapPlaceSearch: MapPlaceSearch, val interaction: MapInteractionController, val mapAppMode: MapAppMode): InputState<MapResult>(state), CoroutineScope {
 	private val SEARCHRESULT_VIEW_FULL_RESULTS = MapResult("__VIEWFULLRESULTS__", name=L.MAP_SEARCH_RESULTS_VIEW_FULL_RESULTS)
 
 	override val coroutineContext: CoroutineContext
@@ -62,6 +63,8 @@ class PlaceSearchView(state: RHMIState, val mapPlaceSearch: MapPlaceSearch, val 
 				item
 			}
 			if (locationResult?.location != null) {
+				// historia celow + ostatni cel do wznowienia
+				mapAppMode.recordDestination(locationResult.name, locationResult.location!!)
 				interaction.navigateTo(locationResult.location)
 				inputComponent.getSuggestAction()?.asHMIAction()?.getTargetModel()?.asRaIntModel()?.value = fullImageView?.state?.id ?: 0
 			}

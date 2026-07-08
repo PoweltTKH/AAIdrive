@@ -42,6 +42,8 @@ interface AppSettings {
 		ENABLED_MAPS("Enabled_Maps", "false", "Show Custom Maps in the car"),
 		MAP_TESTING_ENABLED("Map_Testing_Enabled", "false", "Show a test map in the app"),
 		MAP_QUICK_DESTINATIONS("Map_Quick_Destinations", "[]", "A list of quick destinations"),
+		MAP_RECENT_DESTINATIONS("Map_Recent_Destinations", "[]", "Recently navigated destinations"),
+		MAP_LAST_DESTINATION("Map_Last_Destination", "", "Last navigation destination, for resuming"),
 		MAP_WIDESCREEN("Map_Widescreen", "false", "Show Map in widescreen"),
 		MAP_INVERT_SCROLL("Map_Invert_Scroll", "false", "Invert zoom direction"),
 		MAP_SATELLITE("Map_Satellite", "false", "Show satellite imagery"),
