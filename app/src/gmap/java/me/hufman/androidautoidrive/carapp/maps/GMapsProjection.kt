@@ -3,6 +3,9 @@ package me.hufman.androidautoidrive.carapp.maps
 import android.annotation.SuppressLint
 import android.app.Presentation
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Point
 import android.os.Bundle
 import android.text.Spannable
@@ -31,6 +34,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	var map: GoogleMap? = null
 	var mapListener: Runnable? = null
 	var currentStyleId: Int? = null
+
+	// maska karty aplikacji: przykrywa skrawek mapy nad wspolna linia (dol belki BMW)
+	// i zaokragla prawe rogi mapy; lewe rogi karty zaokragla PNG panelu (NativePanelRenderer)
+	private var mapMask: MapCardMaskView? = null
 
 	// widoki panelu prowadzenia turn-by-turn (panel z lewej)
 	private var navPanel: View? = null
@@ -82,6 +89,12 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		navEta = findViewById(R.id.navEta)
 		navRemaining = findViewById(R.id.navRemaining)
 		layoutNavPanel()
+
+		// nakladka maski na wierzchu calego layoutu (rysuje tylko przy NativePanel.enabled)
+		val mask = MapCardMaskView(context)
+		mapMask = mask
+		addContentView(mask, ViewGroup.LayoutParams(
+				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
 		val gmapView = findViewById<MapView>(R.id.gmapView)
 		gmapView.onCreate(savedInstanceState)
@@ -191,11 +204,15 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
 		val margin = splitMarginPx
-		// panel natywny: caly kadr to mapa (panel poza bitmapa) -> symetryczny padding;
-		// panel w bitmapie: lewy padding powiekszony o panel, zeby pozycja centrowala sie
-		// w widocznym obszarze NA PRAWO od panelu
-		val leftPad = if (NativePanel.enabled) margin else margin + panelWidthPx
-		map?.setPadding(leftPad, 0, margin, 0)
+		// panel natywny: kadr = karta mapy (maska: gorny pas, prawe rogi, marginesy) ->
+		// padding dopasowany do "dziury" maski; panel w bitmapie: stary uklad
+		if (NativePanel.enabled) {
+			map?.setPadding(margin, NativePanel.PANEL_TOP_PX,
+					margin + NativePanel.CARD_EDGE_PX, NativePanel.CARD_EDGE_PX)
+		} else {
+			map?.setPadding(margin + panelWidthPx, 0, margin, 0)
+		}
+		mapMask?.invalidate()
 		// panel tez musi sie dopasowac do biezacego trybu (full/split)
 		layoutNavPanel()
 
@@ -247,6 +264,29 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		when (renderer) {
 			MapsInitializer.Renderer.LATEST -> Log.d("MapsDemo", "The latest version of the renderer is used.")
 			MapsInitializer.Renderer.LEGACY -> Log.d("MapsDemo", "The legacy version of the renderer is used.")
+		}
+	}
+
+	/** Maska karty aplikacji (wariant 2 z makiety): wypelnia #1B1B1D wszystko poza
+	 *  zaokraglonym oknem mapy - gorny pas nad wspolna linia, marginesy dol/prawo,
+	 *  prawe rogi 22 px. Lewa krawedz okna = styk z panelem (ostro, bez zaokraglenia). */
+	private inner class MapCardMaskView(context: Context): View(context) {
+		private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1B1B1D.toInt() }
+		private val path = Path()
+
+		override fun onDraw(canvas: Canvas) {
+			if (!NativePanel.enabled) return
+			val r = NativePanel.CARD_RADIUS_PX.toFloat()
+			val edge = NativePanel.CARD_EDGE_PX.toFloat()
+			val margin = splitMarginPx.toFloat()
+			path.reset()
+			path.fillType = Path.FillType.EVEN_ODD
+			path.addRect(0f, 0f, width.toFloat(), height.toFloat(), Path.Direction.CW)
+			// "dziura" na mape: od lewej krawedzi kadru do prawego marginesu karty
+			path.addRoundRect(margin, NativePanel.PANEL_TOP_PX.toFloat(),
+					width - margin - edge, height - edge,
+					floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f), Path.Direction.CW)
+			canvas.drawPath(path, paint)
 		}
 	}
 }

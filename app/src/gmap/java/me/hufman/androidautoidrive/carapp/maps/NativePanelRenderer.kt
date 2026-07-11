@@ -28,17 +28,25 @@ object NativePanelRenderer {
 	fun render(context: Context, g: NavigationGuidance): ByteArray {
 		val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
 		val c = Canvas(bmp)
+
+		// karta aplikacji (wariant 2 z makiety): lewe rogi zaokraglone, prawa krawedz
+		// styka sie z mapa na ostro; poza clipem zostaje przezroczystosc (tlo auta)
+		val r = NativePanel.CARD_RADIUS_PX.toFloat()
+		val clip = android.graphics.Path().apply {
+			addRoundRect(0f, 0f, W.toFloat(), H.toFloat(),
+					floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r), android.graphics.Path.Direction.CW)
+		}
+		c.clipPath(clip)
 		c.drawColor(0xFF1B1B1D.toInt())
 
-		// zielony blok manewru: PELNA szerokosc pasa (dociagniety do obrazu mapy), nizszy (160 px),
-		// zeby zostawic wiekszy margines od natywnej pomaranczowej strzalki BMW ponizej
-		val greenH = 160f
+		// zielony blok manewru: pelna szerokosc, od samej gory karty
+		val greenH = 176f
 		c.drawRect(0f, 0f, W.toFloat(), greenH, Paint().apply { color = 0xFF0B8043.toInt() })
 
-		// ikona manewru (znak drogowy, biala)
+		// ikona manewru (znak drogowy, biala) - lekki margines od gory (makieta: ~18 px)
 		val iconRes = if (g.isRoundabout) R.drawable.ic_gmap_roundabout else ManeuverIcons.res(g.maneuverType)
 		val icon = context.getDrawable(iconRes)!!.mutate()
-		icon.setBounds(14, 8, 14 + 56, 8 + 56)
+		icon.setBounds(14, 20, 14 + 56, 20 + 56)
 		icon.draw(c)
 
 		// numer zjazdu z ronda obok ikony
@@ -46,7 +54,7 @@ object NativePanelRenderer {
 			val num = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 				color = 0xFFFFFFFF.toInt(); textSize = 44f; isFakeBoldText = true
 			}
-			c.drawText("${g.roundaboutExit}", 84f, 53f, num)
+			c.drawText("${g.roundaboutExit}", 84f, 65f, num)
 		}
 
 		// pelna instrukcja, lamana na max 3 linie (nasz maly font -> brak brutalnego uciecia BMW)
@@ -57,12 +65,12 @@ object NativePanelRenderer {
 				.setEllipsize(TextUtils.TruncateAt.END)
 				.build()
 		c.save()
-		c.translate(14f, 70f)
+		c.translate(14f, 104f)
 		layout.draw(c)
 		c.restore()
 
-		// Przyjazd / Pozostalo (styl jak w dotychczasowym panelu) - PONIZEJ strefy natywnej
-		// pomaranczowej strzalki BMW (PNG-lokalnie ~160..283 zostaje ciemna przerwa na strzalke)
+		// Przyjazd / Pozostalo: ponizej strefy strzalki BMW (ciemna przerwa ~176..280),
+		// wysrodkowane w dolnej strefie z marginesem 18 px od dolnego zaokraglonego rogu
 		val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9AA0A6.toInt(); textSize = 17f }
 		val valBig = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 40f; isFakeBoldText = true
@@ -71,9 +79,9 @@ object NativePanelRenderer {
 			color = 0xFFFFFFFF.toInt(); textSize = 31f; isFakeBoldText = true
 		}
 		c.drawText("Przyjazd", 14f, 300f, cap)
-		c.drawText(formatEta(g.etaEpochMillis), 14f, 340f, valBig)
-		c.drawText("Pozostało", 14f, 380f, cap)
-		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 412f, valMed)
+		c.drawText(formatEta(g.etaEpochMillis), 14f, 338f, valBig)
+		c.drawText("Pozostało", 14f, 376f, cap)
+		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 406f, valMed)
 
 		return png(bmp)
 	}

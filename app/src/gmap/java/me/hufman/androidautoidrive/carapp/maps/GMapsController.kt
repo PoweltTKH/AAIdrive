@@ -250,25 +250,25 @@ class GMapsController(private val context: Context,
 			if (map != null) {
 				map.clear()
 
-				// destination flag: pineska na KONCU polilinii trasy (zawsze na drodze, nie na
-				// geokodzie celu). Stojacy billboard (domyslny) - flat(true) kladl pineske na mapie
-				// i przy obrocie kamery wygladala jak lewitujaca obok konca trasy
-				val dest = navController.currentNavDestination
-				if (dest != null) {
-					val destPos = navController.currentNavRoute?.lastOrNull()
-							?: LatLng(dest.latitude, dest.longitude)
-					val marker = MarkerOptions()
-							.position(destPos)
-							.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
-							.visible(true)
-					map.addMarker(marker)
+				// trasa + pineska z JEDNEJ lokalnej listy punktow: pineska moze zaistniec
+				// WYLACZNIE razem z trasa, dokladnie na jej ostatnim wierzcholku.
+				// Fallback na geokod USUNIETY - rysowal pineske w srodku dzialki/parku
+				// (geokod celu != droga) i przy zgubionym przerysowaniu zostawala tam na stale.
+				val routePoints = navController.currentNavRoute
+				if (routePoints != null && routePoints.size >= 2) {
+					map.addPolyline(PolylineOptions().color(context.getColor(R.color.mapRouteLine)).addAll(routePoints))
+					if (navController.currentNavDestination != null) {
+						map.addMarker(MarkerOptions()
+								.position(routePoints.last())
+								.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+								.visible(true))
+					}
+					NavFileLog.log("drawNavigation: pineska na koncu trasy (${routePoints.size} pkt, koniec=${routePoints.last().latitude},${routePoints.last().longitude})")
+				} else {
+					NavFileLog.log("drawNavigation: brak trasy (dest=${navController.currentNavDestination != null}) - bez pineski")
 				}
-
-				// routing
-				val currentNavRoute = navController.currentNavRoute
-				if (currentNavRoute != null) {
-					map.addPolyline(PolylineOptions().color(context.getColor(R.color.mapRouteLine)).addAll(currentNavRoute))
-				}
+			} else {
+				NavFileLog.log("drawNavigation: mapa jeszcze nie gotowa - rysowanie pominiete (odtworzy mapListener)")
 			}
 		}
 		if (Looper.myLooper() != handler.looper) {

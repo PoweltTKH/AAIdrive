@@ -29,6 +29,7 @@ class MapAppService: CarAppService() {
 		Log.i(MainService.TAG, "Starting GMaps")
 		MapFramePerfLog.init(applicationContext)   // PERF: instrumentacja pipeline'u klatek (wyl. flaga PERF_LOG)
 		CrashFileLog.install(applicationContext)   // crashe do gmap_crash.log (diagnoza bez adb)
+		NavFileLog.init(applicationContext)        // zdarzenia nawigacji do gmap_nav.log
 		// tryb panelu z ustawien (przelacznik "Panel natywny" w opcjach mapy)
 		NativePanel.enabled = appSettings[AppSettings.KEYS.MAP_NATIVE_PANEL].toBoolean()
 		val cdsData = CDSDataProvider()

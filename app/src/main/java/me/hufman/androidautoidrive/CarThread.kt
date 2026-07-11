@@ -38,15 +38,18 @@ class CarThread(name: String, var runnable: () -> (Unit)): Thread(name) {
 		} catch (e: org.apache.etch.util.TimeoutException) {
 			// phone was unplugged during an RPC command
 			Log.i(TAG, "Shutting down thread $name due to Etch TimeoutException")
+			me.hufman.androidautoidrive.carapp.maps.CrashFileLog.note("CarThread $name: Etch TimeoutException (BT)", e)
 		} catch (e: RuntimeException) {
 			// phone was unplugged during an RPC command
 			Log.i(TAG, "Shutting down thread $name due to RuntimeException: $e", e)
+			me.hufman.androidautoidrive.carapp.maps.CrashFileLog.note("CarThread $name: RuntimeException", e)
 		} catch (e: IOException) {
 			val cause = e.cause
 			if (!iDriveConnectionObserver.isConnected) {
 				// the car is no longer connected
 				// so this is most likely a crash caused by the closed connection
 				Log.i(TAG, "Shutting down thread $name due to disconnection")
+				me.hufman.androidautoidrive.carapp.maps.CrashFileLog.note("CarThread $name: rozlaczenie z autem", e)
 			} else if (cause is org.apache.etch.util.TimeoutException) {
 				Log.i(TAG, "Shutting down thread $name due to Etch TimeoutException")
 			} else if (cause is RuntimeException) {

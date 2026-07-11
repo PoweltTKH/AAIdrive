@@ -130,6 +130,13 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				currentNavRoute = newStepPaths.flatten()
 				currentStepIndex = 0
 				offRouteCount = 0
+				// diagnostyka: jak daleko geokod celu lezy od konca trasy (typowo kilkadziesiat m)
+				currentNavRoute?.lastOrNull()?.let { end ->
+					val res = FloatArray(1)
+					Location.distanceBetween(end.latitude, end.longitude, dest.latitude, dest.longitude, res)
+					NavFileLog.log("trasa OK: ${newSteps.size} krokow, ${currentNavRoute?.size} pkt, " +
+							"koniec<->geokod=${res[0].toInt()}m, trafficFactor=%.2f".format(trafficFactor))
+				}
 				callback(this@GMapsNavController)
 			}
 		})
@@ -161,6 +168,7 @@ class GMapsNavController(val geoClient: GeoApiContext, val locationProvider: Car
 				lastRerouteTimeMs = now
 				offRouteCount = 0
 				Log.i(TAG, "Off route by ${bestDist.toInt()} m, recalculating")
+				NavFileLog.log("reroute: ${bestDist.toInt()}m od trasy")
 				currentNavDestination?.let { navigateTo(it) }
 				return null   // nowa trasa w drodze; pomijamy te klatke prowadzenia
 			}

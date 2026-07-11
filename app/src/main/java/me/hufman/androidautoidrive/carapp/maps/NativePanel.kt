@@ -27,9 +27,18 @@ object NativePanel {
 	/** Szerokosc lewego pasa oddanego natywnym komponentom (px ekranu auta). */
 	const val PANEL_WIDTH_PX = 223
 
-	/** Wysokosc PNG panelu (px): zielony blok u samej gory + przerwa na natywna strzalke BMW
-	 *  + sekcja Przyjazd/Pozostalo na dole. */
-	const val PANEL_HEIGHT_PX = 420
+	/** Wspolna gorna linia karty aplikacji = dol belki tytulowej BMW (makieta: wariant 2).
+	 *  Uzywana przez PNG panelu ORAZ maske mapy - nie moga sie rozjechac. */
+	const val PANEL_TOP_PX = 48
+
+	/** Wysokosc PNG panelu: od PANEL_TOP_PX do dolnej krawedzi karty (480 - 8 marginesu). */
+	const val PANEL_HEIGHT_PX = 424
+
+	/** Promien zewnetrznych rogow karty aplikacji (panel: lewe rogi, mapa: prawe). */
+	const val CARD_RADIUS_PX = 22
+
+	/** Margines karty od dolu ekranu i od panelu BMW po prawej. */
+	const val CARD_EDGE_PX = 8
 
 	@Volatile private var handler: Handler? = null
 	@Volatile private var distanceSink: ((String) -> Unit)? = null
