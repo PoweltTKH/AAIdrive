@@ -31,6 +31,8 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - **Natywne komponenty NAŁOŻONE na obraz nie renderują się** (z-order ID6); obok obrazu — działają.
 - **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
 - Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
+- **Pozycje RHMI (property 20/21) są ABSOLUTNE w oknie aplikacji** — NIE korygować o `paddingLeft/Top` z RHMIDimensions (builds 78–83: korekty przesuwały całą kartę w górę/lewo). Realne wymiary auta logowane do `gmap_nav.log` przy połączeniu.
+- **Wszystko rysowane na projekcji musi leżeć w REGIONIE PRZECHWYTYWANIA** (`findInnerRect` na surowych wymiarach displaya, NIE `appWidth` RHMI) — maska/overlay poza kadrem po prostu nie trafia do klatki (build 83: brak prawych rogów karty).
 
 ## Stan bieżący — commit 97e1b71 (wersja 1.4.3-83) — KARTA APLIKACJI (WARIANT 2)
 Architektura po rozdzieleniu panel/mapa (zysk zmierzony: bajty/klatkę 33→17,6 KB [−45%], fps 1,44→2,22 przy tym samym łączu ~50 KB/s, spiki 3× rzadsze):
@@ -56,7 +58,7 @@ Do weryfikacji w jeździe: snap grota, dystans w tytule, prawy margines PNG (26 
 Stały debug keystore (SHA-1 `A1:DA:...`, storepass/keypass `android`, alias `androiddebugkey`, base64 w sekrecie `DEBUG_KEYSTORE_BASE64`). Jawny `signingConfig` w `build.gradle` → `../debug.keystore` (NIE domyślna ścieżka AGP `~/.android/` — na runnerze GitHub nie działa, build #8 podpisał złym kluczem). Workflow dekoduje sekret do `$GITHUB_WORKSPACE/debug.keystore`. Stały podpis = instalacja „Aktualizuj" bez odinstalowania + zgodność ze Spotify App Remote.
 
 ## Kolejka
-1. Jazda weryfikacyjna commit 97e1b71 (1.4.3-83) — KARTA APLIKACJI wg makiety (wariant 2, klepnięty przez Pawła): wspólna linia `PANEL_TOP_PX=48` (kalibrować tę JEDNĄ stałą jeśli o włos się rozjedzie z belką BMW), PNG belki z lewymi rogami 22 px (`CARD_RADIUS_PX`), maska mapy `MapCardMaskView` (#1B1B1D, prawe rogi, marginesy `CARD_EDGE_PX=8`), padding kamery pod „dziurę" maski. Pineska: TYLKO z trasą, ostatni wierzchołek polilinii, fallback na geokod USUNIĘTY (stawiał pineskę w parku obok drogi). Diagnostyka: `gmap_nav.log` (koniec↔geokod, przerysowania, reroute) + `CrashFileLog.note` w połykanych zgonach `CarThread` (ciche wywałki BT zostawiają ślad).
+1. Jazda weryfikacyjna commit da275f8 (1.4.3-86) — KARTA APLIKACJI po poprawkach kalibracyjnych: pozycje ABSOLUTNE (PNG (0,56), mapa (223,0)), linia `PANEL_TOP_PX=56` (kalibrować tę JEDNĄ stałą wg `gmap_nav.log` z realnymi wymiarami), maska+padding z regionu przechwytywania (prawe rogi 22 px już w kadrze). Pineska: TYLKO z trasą, ostatni wierzchołek polilinii (fallback na geokod usunięty). Diagnostyka: `gmap_nav.log` (wymiary RHMI, koniec↔geokod, przerysowania, reroute) + `CrashFileLog.note` w połykanych zgonach `CarThread`.
 2. Fotoradary etap 1 (po weryfikacji karty): samo-aktualizująca baza OSM Overpass + GITD/dane.gov.pl (updater WorkManager co tydzień, plik lokalny, zero sieci w jeździe), żółta belka z ikoną/odliczaniem/limitem; potem etap 2: odcinkowy (średnia = dystans wzdłuż trasy / czas, bez odczytu prędkości).
 3. Kosmetyka ikon-znaków ze zdjęć (kształty rysowane „na oko" — iterować jak C-12).
 4. Ostrzejszy JPEG w ruchu (q40) — panel już nie cierpi na kompresji; kolejne −25% bajtów.
