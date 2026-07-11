@@ -37,6 +37,11 @@ class MapAppService: CarAppService() {
 		val carLocationProvider = CdsLocationProvider(cdsData, false)
 		val mapAppMode = MapAppMode.build(RHMIDimensions.create(carInformation.capabilities), MutableAppSettingsReceiver(this, handler), cdsData, MusicAppMode.TRANSPORT_PORTS.fromPort(iDriveConnectionStatus.port) ?: MusicAppMode.TRANSPORT_PORTS.BT)
 		this.mapAppMode = mapAppMode
+		// realne wymiary/paddingi RHMI tego auta - do kalibracji karty z danych, nie ze zgadywania
+		mapAppMode.rhmiDimensions.let {
+			NavFileLog.log("wymiary RHMI: rhmi=${it.rhmiWidth}x${it.rhmiHeight} app=${it.appWidth}x${it.appHeight} " +
+					"visible=${it.visibleWidth}x${it.visibleHeight} padding=${it.paddingLeft},${it.paddingTop}")
+		}
 		val mapScreenCapture = VirtualDisplayScreenCapture.build(mapAppMode)
 		this.mapScreenCapture = mapScreenCapture
 		val virtualDisplay = VirtualDisplayScreenCapture.createVirtualDisplay(applicationContext, mapScreenCapture.imageCapture, 250)

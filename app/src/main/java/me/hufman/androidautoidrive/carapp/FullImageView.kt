@@ -118,9 +118,16 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		inputList.setProperty(RHMIProperty.PropertyId.BOOKMARKABLE, true)
 
 		imageComponent.setVisible(true)
-		// pod flaga testu natywnego panelu obraz przesuniety w prawo o pas natywny i zwezony
-		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft + nativePanelW)    // positionX
-		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -config.rhmiDimensions.paddingTop)    // positionY
+		// panel natywny: pozycje ABSOLUTNE (obraz mapy od razu za pasem panelu, od gory okna);
+		// korekty -padding przesuwaly cala karte i psuly styk z PNG panelu.
+		// tryb klasyczny (pelny ekran): oryginalne korekty -padding jak w upstream
+		if (nativePanelW > 0) {
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, nativePanelW)    // positionX
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 0)    // positionY
+		} else {
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft)    // positionX
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -config.rhmiDimensions.paddingTop)    // positionY
+		}
 		imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth - nativePanelW)
 		imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, config.rhmiDimensions.visibleHeight)
 	}

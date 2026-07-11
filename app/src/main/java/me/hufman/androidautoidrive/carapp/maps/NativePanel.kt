@@ -28,11 +28,13 @@ object NativePanel {
 	const val PANEL_WIDTH_PX = 223
 
 	/** Wspolna gorna linia karty aplikacji = dol belki tytulowej BMW (makieta: wariant 2).
-	 *  Uzywana przez PNG panelu ORAZ maske mapy - nie moga sie rozjechac. */
-	const val PANEL_TOP_PX = 48
+	 *  Uzywana przez PNG panelu ORAZ maske mapy - nie moga sie rozjechac.
+	 *  UWAGA: pozycje RHMI sa ABSOLUTNE w oknie aplikacji (potwierdzone empirycznie,
+	 *  builds 78-83) - zadnych korekt o padding. Kalibracja linii = TA jedna stala. */
+	const val PANEL_TOP_PX = 56
 
-	/** Wysokosc PNG panelu: od PANEL_TOP_PX do dolnej krawedzi karty (480 - 8 marginesu). */
-	const val PANEL_HEIGHT_PX = 424
+	/** Wysokosc PNG panelu: od PANEL_TOP_PX do dolnej krawedzi karty (480 - CARD_EDGE_PX). */
+	const val PANEL_HEIGHT_PX = 416
 
 	/** Promien zewnetrznych rogow karty aplikacji (panel: lewe rogi, mapa: prawe). */
 	const val CARD_RADIUS_PX = 22

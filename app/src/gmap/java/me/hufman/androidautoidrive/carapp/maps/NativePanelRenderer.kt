@@ -78,10 +78,10 @@ object NativePanelRenderer {
 		val valMed = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 31f; isFakeBoldText = true
 		}
-		c.drawText("Przyjazd", 14f, 300f, cap)
-		c.drawText(formatEta(g.etaEpochMillis), 14f, 338f, valBig)
-		c.drawText("Pozostało", 14f, 376f, cap)
-		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 406f, valMed)
+		c.drawText("Przyjazd", 14f, 292f, cap)
+		c.drawText(formatEta(g.etaEpochMillis), 14f, 330f, valBig)
+		c.drawText("Pozostało", 14f, 368f, cap)
+		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 398f, valMed)
 
 		return png(bmp)
 	}
