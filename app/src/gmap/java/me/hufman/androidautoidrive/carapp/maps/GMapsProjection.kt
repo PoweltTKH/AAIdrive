@@ -47,12 +47,10 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private var navEta: TextView? = null
 	private var navRemaining: TextView? = null
 
-	val fullDimensions = display.run {
-		val small = Point()
-		val dimension = Point()
-		display.getCurrentSizeRange(small, dimension)
-		SubsetRHMIDimensions(dimension.x, dimension.y)
-	}
+	// surowe wymiary wirtualnego wyswietlacza - te same, ktorych uzywa przechwytywanie klatek
+	private val displaySize = Point().also { display.getCurrentSizeRange(Point(), it) }
+
+	val fullDimensions = SubsetRHMIDimensions(displaySize.x, displaySize.y)
 	val sidebarDimensions = SidebarRHMIDimensions(fullDimensions) {
 		appSettings[AppSettings.KEYS.MAP_WIDESCREEN].toBoolean()
 	}
@@ -61,15 +59,28 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	private val panelWidthPx: Int
 		get() = (sidebarDimensions.appWidth * 0.30).toInt()
 
-	/** Lewy margines widocznego obszaru na wirtualnym ekranie.
-	 *  Przy natywnym panelu komponent obrazu w aucie jest zwezony o pas natywny i przesuniety
-	 *  w prawo, wiec region przechwytywania (wezszy aspekt) zaczyna sie dalej od lewej. */
+	/** Lewy margines widocznego obszaru na wirtualnym ekranie (tryb panelu w bitmapie). */
 	private val splitMarginPx: Int
-		get() {
-			var m = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
-			if (NativePanel.enabled) m += NativePanel.PANEL_WIDTH_PX / 2
-			return m
+		get() = (fullDimensions.appWidth - sidebarDimensions.appWidth) / 2
+
+	/** Region wyswietlacza, ktory REALNIE trafia do klatki przy panelu natywnym -
+	 *  lustrzane odbicie findInnerRect z VirtualDisplayScreenCapture (ta sama matematyka,
+	 *  te same surowe wymiary displaya). Maska i padding kamery MUSZA uzywac tego regionu;
+	 *  liczenie z appWidth (wymiary RHMI) dawalo szersza "dziure" niz kadr i prawa krawedz
+	 *  maski z zaokraglonymi rogami wypadala poza klatka. */
+	private fun mapCaptureRect(): android.graphics.Rect {
+		val mapW = sidebarDimensions.visibleWidth - NativePanel.PANEL_WIDTH_PX
+		val mapH = sidebarDimensions.visibleHeight
+		var w = displaySize.x
+		var h = w * mapH / mapW
+		if (h > displaySize.y) {
+			h = displaySize.y
+			w = h * mapW / mapH
 		}
+		val left = (displaySize.x - w) / 2
+		val top = (displaySize.y - h) / 2
+		return android.graphics.Rect(left, top, left + w, top + h)
+	}
 
 	@SuppressLint("MissingPermission")
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,13 +214,16 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 
 		// the narrow-screen option centers the viewport to the middle of the display
 		// so update the map's margin to match
-		val margin = splitMarginPx
 		// panel natywny: kadr = karta mapy (maska: gorny pas, prawe rogi, marginesy) ->
-		// padding dopasowany do "dziury" maski; panel w bitmapie: stary uklad
+		// padding dopasowany do "dziury" maski, liczonej z REGIONU PRZECHWYTYWANIA;
+		// panel w bitmapie: stary uklad
 		if (NativePanel.enabled) {
-			map?.setPadding(margin, NativePanel.PANEL_TOP_PX,
-					margin + NativePanel.CARD_EDGE_PX, NativePanel.CARD_EDGE_PX)
+			val cap = mapCaptureRect()
+			map?.setPadding(cap.left, cap.top + NativePanel.PANEL_TOP_PX,
+					displaySize.x - cap.right + NativePanel.CARD_EDGE_PX,
+					displaySize.y - cap.bottom + NativePanel.CARD_EDGE_PX)
 		} else {
+			val margin = splitMarginPx
 			map?.setPadding(margin + panelWidthPx, 0, margin, 0)
 		}
 		mapMask?.invalidate()
@@ -278,13 +292,14 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 			if (!NativePanel.enabled) return
 			val r = NativePanel.CARD_RADIUS_PX.toFloat()
 			val edge = NativePanel.CARD_EDGE_PX.toFloat()
-			val margin = splitMarginPx.toFloat()
+			// "dziura" na mape liczona z regionu PRZECHWYTYWANIA (nie z wymiarow RHMI) -
+			// wszystko, co rysujemy, musi lezec wewnatrz kadru, inaczej wypada poza klatka
+			val cap = mapCaptureRect()
 			path.reset()
 			path.fillType = Path.FillType.EVEN_ODD
 			path.addRect(0f, 0f, width.toFloat(), height.toFloat(), Path.Direction.CW)
-			// "dziura" na mape: od lewej krawedzi kadru do prawego marginesu karty
-			path.addRoundRect(margin, NativePanel.PANEL_TOP_PX.toFloat(),
-					width - margin - edge, height - edge,
+			path.addRoundRect(cap.left.toFloat(), cap.top + NativePanel.PANEL_TOP_PX.toFloat(),
+					cap.right - edge, cap.bottom - edge,
 					floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f), Path.Direction.CW)
 			canvas.drawPath(path, paint)
 		}
