@@ -23,9 +23,10 @@ import java.util.Locale
  */
 object NativePanelRenderer {
 	const val W = NativePanel.PANEL_WIDTH_PX
-	const val H = NativePanel.PANEL_HEIGHT_PX
 
 	fun render(context: Context, g: NavigationGuidance): ByteArray {
+		// wysokosc karty z realnych wymiarow auta (ustawiana przy polaczeniu)
+		val H = NativePanel.panelHeightPx
 		val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
 		val c = Canvas(bmp)
 
@@ -69,8 +70,8 @@ object NativePanelRenderer {
 		layout.draw(c)
 		c.restore()
 
-		// Przyjazd / Pozostalo: ponizej strefy strzalki BMW (ciemna przerwa ~176..280),
-		// wysrodkowane w dolnej strefie z marginesem 18 px od dolnego zaokraglonego rogu
+		// Przyjazd / Pozostalo: ponizej strefy strzalki BMW, kotwiczone od DOLU karty -
+		// staly margines od dolnego zaokraglonego rogu, niezaleznie od wysokosci ekranu auta
 		val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9AA0A6.toInt(); textSize = 17f }
 		val valBig = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 40f; isFakeBoldText = true
@@ -78,10 +79,10 @@ object NativePanelRenderer {
 		val valMed = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = 0xFFFFFFFF.toInt(); textSize = 31f; isFakeBoldText = true
 		}
-		c.drawText("Przyjazd", 14f, 292f, cap)
-		c.drawText(formatEta(g.etaEpochMillis), 14f, 330f, valBig)
-		c.drawText("Pozostało", 14f, 368f, cap)
-		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, 398f, valMed)
+		c.drawText("Przyjazd", 14f, H - 124f, cap)
+		c.drawText(formatEta(g.etaEpochMillis), 14f, H - 86f, valBig)
+		c.drawText("Pozostało", 14f, H - 48f, cap)
+		c.drawText(formatRemaining(g.remainingDistanceMeters), 14f, H - 18f, valMed)
 
 		return png(bmp)
 	}

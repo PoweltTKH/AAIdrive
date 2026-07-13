@@ -31,7 +31,7 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - **Natywne komponenty NAŁOŻONE na obraz nie renderują się** (z-order ID6); obok obrazu — działają.
 - **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
 - Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
-- **Pozycje RHMI (property 20/21) są WZGLĘDEM PADDINGU** — komponenty ustawiają `-padding + pozycja_ekranowa` (jak upstream). Dowód: build 86 z pozycjami bez korekt przesunął całą kartę w prawo/dół o padding. (Wcześniejsza teoria „absolutne" z buildów 78–83 była BŁĘDNA — tam problemem była za mała stała linii i bug maski.) Realne wymiary auta logowane do `gmap_nav.log` przy połączeniu.
+- **Geometria RHMI G30 (z `gmap_nav.log`, NIE zgadywać): `rhmi=1440x540 app=748x473 visible=838x540 padding=90,67`.** Pozycje komponentów liczą się od rogu obszaru TREŚCI (za kolumną home 90 px, pod belką BMW 67 px) — górna linia karty = pozycja Y=0, bez stałych. Karta: PNG (0,0) 223×(appHeight−8), mapa (223,0) (appWidth−223−8)×(appHeight−8); marginesy karty w ROZMIARZE komponentów, maska tylko zaokrągla prawe rogi. Wymiary logowane przy każdym połączeniu (X1 może mieć inne).
 - **Wszystko rysowane na projekcji musi leżeć w REGIONIE PRZECHWYTYWANIA** (`findInnerRect` na surowych wymiarach displaya, NIE `appWidth` RHMI) — maska/overlay poza kadrem po prostu nie trafia do klatki (build 83: brak prawych rogów karty).
 
 ## Stan bieżący — commit 97e1b71 (wersja 1.4.3-83) — KARTA APLIKACJI (WARIANT 2)

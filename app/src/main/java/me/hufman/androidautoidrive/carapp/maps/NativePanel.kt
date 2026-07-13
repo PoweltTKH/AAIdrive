@@ -27,15 +27,12 @@ object NativePanel {
 	/** Szerokosc lewego pasa oddanego natywnym komponentom (px ekranu auta). */
 	const val PANEL_WIDTH_PX = 223
 
-	/** Wspolna gorna linia karty aplikacji = dol belki tytulowej BMW (makieta: wariant 2).
-	 *  Uzywana przez PNG panelu ORAZ maske mapy - nie moga sie rozjechac.
-	 *  UWAGA: pozycje RHMI sa WZGLEDEM PADDINGU (build 86 z pozycjami bez korekt przesunal
-	 *  karte o padding w prawo/dol) - komponenty ustawiaja -padding + wartosc ekranowa.
-	 *  Kalibracja linii = TA jedna stala; realne paddingi auta w gmap_nav.log. */
-	const val PANEL_TOP_PX = 56
-
-	/** Wysokosc PNG panelu: od PANEL_TOP_PX do dolnej krawedzi karty (480 - CARD_EDGE_PX). */
-	const val PANEL_HEIGHT_PX = 416
+	/** GEOMETRIA KARTY (z realnych wymiarow RHMI auta, gmap_nav.log):
+	 *  pozycje komponentow licza sie od rogu obszaru TRESCI (za kolumna home, pod belka BMW)
+	 *  - czyli gorna linia karty (= dol belki) to po prostu pozycja Y=0, bez magicznych stalych.
+	 *  G30: rhmi=1440x540, app=748x473, padding=90,67. Wysokosc panelu ustawiana dynamicznie
+	 *  z appHeight przy polaczeniu (MapAppService) - X1/inne auta dostana swoje wartosci. */
+	@Volatile var panelHeightPx = 465
 
 	/** Promien zewnetrznych rogow karty aplikacji (panel: lewe rogi, mapa: prawe). */
 	const val CARD_RADIUS_PX = 22

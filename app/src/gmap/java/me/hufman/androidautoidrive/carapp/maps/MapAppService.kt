@@ -42,6 +42,8 @@ class MapAppService: CarAppService() {
 			NavFileLog.log("wymiary RHMI: rhmi=${it.rhmiWidth}x${it.rhmiHeight} app=${it.appWidth}x${it.appHeight} " +
 					"visible=${it.visibleWidth}x${it.visibleHeight} padding=${it.paddingLeft},${it.paddingTop}")
 		}
+		// wysokosc karty z REALNYCH wymiarow tego auta (obszar tresci minus dolny margines)
+		NativePanel.panelHeightPx = mapAppMode.rhmiDimensions.appHeight - NativePanel.CARD_EDGE_PX
 		val mapScreenCapture = VirtualDisplayScreenCapture.build(mapAppMode)
 		this.mapScreenCapture = mapScreenCapture
 		val virtualDisplay = VirtualDisplayScreenCapture.createVirtualDisplay(applicationContext, mapScreenCapture.imageCapture, 250)

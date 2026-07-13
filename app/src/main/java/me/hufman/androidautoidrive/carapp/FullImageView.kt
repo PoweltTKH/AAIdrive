@@ -40,9 +40,19 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 	val inputList = state.componentsList.filterIsInstance<RHMIComponent.List>().first()
 	val focusEvent = state.app.events.values.filterIsInstance<RHMIEvent.FocusEvent>().first()
 
-	// natywny panel: obraz mapy zwezony o lewy pas oddany natywnym komponentom
+	// natywny panel: obraz mapy zwezony o lewy pas oddany natywnym komponentom.
+	// Karta zyje w obszarze TRESCI (appWidth x appHeight, pozycje od (0,0) tego obszaru),
+	// z marginesem CARD_EDGE od prawej i dolu; tryb klasyczny: pelny ekran przez visible+(-padding)
 	private val nativePanelW: Int
 		get() = if (NativePanel.enabled) NativePanel.PANEL_WIDTH_PX else 0
+
+	private fun mapWidth(): Int =
+			if (nativePanelW > 0) config.rhmiDimensions.appWidth - nativePanelW - NativePanel.CARD_EDGE_PX
+			else config.rhmiDimensions.visibleWidth
+
+	private fun mapHeight(): Int =
+			if (nativePanelW > 0) config.rhmiDimensions.appHeight - NativePanel.CARD_EDGE_PX
+			else config.rhmiDimensions.visibleHeight
 
 	fun initWidgets() {
 		// set up the components on the map
@@ -56,9 +66,9 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		state.focusCallback = FocusCallback { focused ->
 			if (focused) {
 				Log.i(TAG, "Showing map on full screen")
-				imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth - nativePanelW)
-				imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, config.rhmiDimensions.visibleHeight)
-				frameUpdater.showWindow(config.rhmiDimensions.visibleWidth - nativePanelW, config.rhmiDimensions.visibleHeight, imageModel)
+				imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, mapWidth())
+				imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, mapHeight())
+				frameUpdater.showWindow(mapWidth(), mapHeight(), imageModel)
 				focusEvent.triggerEvent(mapOf(0 to inputList.id, 41 to 3))
 			} else {
 				Log.i(TAG, "Hiding map on full screen")
@@ -118,11 +128,16 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		inputList.setProperty(RHMIProperty.PropertyId.BOOKMARKABLE, true)
 
 		imageComponent.setVisible(true)
-		// pozycje sa wzgledem paddingu (jak w upstream); przy panelu natywnym obraz mapy
-		// przesuniety w prawo o pas panelu - ekranowo zaczyna sie na (nativePanelW, 0)
-		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft + nativePanelW)    // positionX
-		imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -config.rhmiDimensions.paddingTop)    // positionY
-		imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, config.rhmiDimensions.visibleWidth - nativePanelW)
-		imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, config.rhmiDimensions.visibleHeight)
+		// panel natywny: mapa w obszarze tresci od razu za pasem panelu, karta od (0,0);
+		// tryb klasyczny: pelny ekran z korekta -padding (bleed pod belke, jak upstream)
+		if (nativePanelW > 0) {
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, nativePanelW)    // positionX
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 0)    // positionY
+		} else {
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft)    // positionX
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -config.rhmiDimensions.paddingTop)    // positionY
+		}
+		imageComponent.setProperty(RHMIProperty.PropertyId.WIDTH.id, mapWidth())
+		imageComponent.setProperty(RHMIProperty.PropertyId.HEIGHT.id, mapHeight())
 	}
 }

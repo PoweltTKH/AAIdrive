@@ -69,8 +69,9 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	 *  liczenie z appWidth (wymiary RHMI) dawalo szersza "dziure" niz kadr i prawa krawedz
 	 *  maski z zaokraglonymi rogami wypadala poza klatka. */
 	private fun mapCaptureRect(): android.graphics.Rect {
-		val mapW = sidebarDimensions.visibleWidth - NativePanel.PANEL_WIDTH_PX
-		val mapH = sidebarDimensions.visibleHeight
+		// wymiary komponentu obrazu mapy w aucie (obszar tresci minus panel i margines karty)
+		val mapW = sidebarDimensions.appWidth - NativePanel.PANEL_WIDTH_PX - NativePanel.CARD_EDGE_PX
+		val mapH = sidebarDimensions.appHeight - NativePanel.CARD_EDGE_PX
 		var w = displaySize.x
 		var h = w * mapH / mapW
 		if (h > displaySize.y) {
@@ -218,10 +219,11 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		// padding dopasowany do "dziury" maski, liczonej z REGIONU PRZECHWYTYWANIA;
 		// panel w bitmapie: stary uklad
 		if (NativePanel.enabled) {
+			// kadr == komponent mapy w aucie (marginesy karty sa w rozmiarze komponentu,
+			// nie w masce) -> kamera centruje sie dokladnie w wycinku przechwytywania
 			val cap = mapCaptureRect()
-			map?.setPadding(cap.left, cap.top + NativePanel.PANEL_TOP_PX,
-					displaySize.x - cap.right + NativePanel.CARD_EDGE_PX,
-					displaySize.y - cap.bottom + NativePanel.CARD_EDGE_PX)
+			map?.setPadding(cap.left, cap.top,
+					displaySize.x - cap.right, displaySize.y - cap.bottom)
 		} else {
 			val margin = splitMarginPx
 			map?.setPadding(margin + panelWidthPx, 0, margin, 0)
@@ -291,15 +293,15 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 		override fun onDraw(canvas: Canvas) {
 			if (!NativePanel.enabled) return
 			val r = NativePanel.CARD_RADIUS_PX.toFloat()
-			val edge = NativePanel.CARD_EDGE_PX.toFloat()
-			// "dziura" na mape liczona z regionu PRZECHWYTYWANIA (nie z wymiarow RHMI) -
-			// wszystko, co rysujemy, musi lezec wewnatrz kadru, inaczej wypada poza klatka
+			// kadr == komponent mapy 1:1, wiec maska to juz TYLKO zaokraglenie prawych rogow:
+			// wypelniamy wszystko poza dziura o ksztalcie kadru z prawymi rogami 22 px
+			// (w kadrze laduja wylacznie narozne "wygryzki"; marginesy karty daje rozmiar komponentu)
 			val cap = mapCaptureRect()
 			path.reset()
 			path.fillType = Path.FillType.EVEN_ODD
 			path.addRect(0f, 0f, width.toFloat(), height.toFloat(), Path.Direction.CW)
-			path.addRoundRect(cap.left.toFloat(), cap.top + NativePanel.PANEL_TOP_PX.toFloat(),
-					cap.right - edge, cap.bottom - edge,
+			path.addRoundRect(cap.left.toFloat(), cap.top.toFloat(),
+					cap.right.toFloat(), cap.bottom.toFloat(),
 					floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f), Path.Direction.CW)
 			canvas.drawPath(path, paint)
 		}
