@@ -29,8 +29,9 @@ object NativePanel {
 
 	/** Wspolna gorna linia karty aplikacji = dol belki tytulowej BMW (makieta: wariant 2).
 	 *  Uzywana przez PNG panelu ORAZ maske mapy - nie moga sie rozjechac.
-	 *  UWAGA: pozycje RHMI sa ABSOLUTNE w oknie aplikacji (potwierdzone empirycznie,
-	 *  builds 78-83) - zadnych korekt o padding. Kalibracja linii = TA jedna stala. */
+	 *  UWAGA: pozycje RHMI sa WZGLEDEM PADDINGU (build 86 z pozycjami bez korekt przesunal
+	 *  karte o padding w prawo/dol) - komponenty ustawiaja -padding + wartosc ekranowa.
+	 *  Kalibracja linii = TA jedna stala; realne paddingi auta w gmap_nav.log. */
 	const val PANEL_TOP_PX = 56
 
 	/** Wysokosc PNG panelu: od PANEL_TOP_PX do dolnej krawedzi karty (480 - CARD_EDGE_PX). */

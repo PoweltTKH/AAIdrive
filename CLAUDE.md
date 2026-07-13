@@ -31,7 +31,7 @@ Użytkownik: Paweł, architekt. **Odpowiadaj po polsku, zwięźle, konkretnie, w
 - **Natywne komponenty NAŁOŻONE na obraz nie renderują się** (z-order ID6); obok obrazu — działają.
 - **GPS auta (CDS) ma stały błąd lateralny** — grot pozycji wymaga snapowania do polilinii trasy.
 - Deskryptor RHMI (smartthings = onlineservices id5 v2) jest podpisany — nie można dodawać komponentów; stan mapy (`hmiState 19`) ma wolne: `image 134` (raImageModel 530) + `label 135/136/137` (raDataModel 527-529) + tytuł stanu (526).
-- **Pozycje RHMI (property 20/21) są ABSOLUTNE w oknie aplikacji** — NIE korygować o `paddingLeft/Top` z RHMIDimensions (builds 78–83: korekty przesuwały całą kartę w górę/lewo). Realne wymiary auta logowane do `gmap_nav.log` przy połączeniu.
+- **Pozycje RHMI (property 20/21) są WZGLĘDEM PADDINGU** — komponenty ustawiają `-padding + pozycja_ekranowa` (jak upstream). Dowód: build 86 z pozycjami bez korekt przesunął całą kartę w prawo/dół o padding. (Wcześniejsza teoria „absolutne" z buildów 78–83 była BŁĘDNA — tam problemem była za mała stała linii i bug maski.) Realne wymiary auta logowane do `gmap_nav.log` przy połączeniu.
 - **Wszystko rysowane na projekcji musi leżeć w REGIONIE PRZECHWYTYWANIA** (`findInnerRect` na surowych wymiarach displaya, NIE `appWidth` RHMI) — maska/overlay poza kadrem po prostu nie trafia do klatki (build 83: brak prawych rogów karty).
 
 ## Stan bieżący — commit 97e1b71 (wersja 1.4.3-83) — KARTA APLIKACJI (WARIANT 2)

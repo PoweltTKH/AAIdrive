@@ -129,11 +129,11 @@ class MapApp(iDriveConnectionStatus: IDriveConnectionStatus, securityAccess: Sec
 
 		// dystans do manewru idzie w TYTUL stanu (gorny pasek, zamiast "Map") - patrz distanceSink;
 		// labelki zostaja ukryte, a zielony blok (PNG) siedzi od razu pod tytulem - jak w starym panelu.
-		// Pozycje ABSOLUTNE (bez korekt o padding!) - korekty -padding przesuwaly cala karte
-		// w gore/lewo: rozjazd z belka BMW, szczelina na styku z mapa, niedociagniety dol.
+		// Pozycje sa WZGLEDEM PADDINGU (dowod: build 86 z pozycjami (0,56) przesunal karte
+		// w prawo/dol o padding) - korekta -padding przywraca ekranowe (0, PANEL_TOP_PX).
 		extraImage?.apply {
-			setProperty(RHMIProperty.PropertyId.POSITION_X.id, 0)
-			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, NativePanel.PANEL_TOP_PX)
+			setProperty(RHMIProperty.PropertyId.POSITION_X.id, -mapAppMode.rhmiDimensions.paddingLeft)
+			setProperty(RHMIProperty.PropertyId.POSITION_Y.id, -mapAppMode.rhmiDimensions.paddingTop + NativePanel.PANEL_TOP_PX)
 			setProperty(RHMIProperty.PropertyId.WIDTH.id, NativePanel.PANEL_WIDTH_PX)
 			setProperty(RHMIProperty.PropertyId.HEIGHT.id, NativePanel.PANEL_HEIGHT_PX)
 			setVisible(true)
