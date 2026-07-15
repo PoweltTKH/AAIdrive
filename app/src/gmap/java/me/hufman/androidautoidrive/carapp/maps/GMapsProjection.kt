@@ -69,8 +69,9 @@ class GMapsProjection(val parentContext: Context, display: Display, val appSetti
 	 *  liczenie z appWidth (wymiary RHMI) dawalo szersza "dziure" niz kadr i prawa krawedz
 	 *  maski z zaokraglonymi rogami wypadala poza klatka. */
 	private fun mapCaptureRect(): android.graphics.Rect {
-		// wymiary komponentu obrazu mapy w aucie (obszar tresci minus panel i margines karty)
-		val mapW = sidebarDimensions.appWidth - NativePanel.PANEL_WIDTH_PX - NativePanel.CARD_EDGE_PX
+		// wymiary komponentu obrazu mapy w aucie: karta podchodzi pod lewy padding okna,
+		// wiec budzet poziomy to visibleWidth (pion od linii belki: appHeight)
+		val mapW = sidebarDimensions.visibleWidth - NativePanel.PANEL_WIDTH_PX - NativePanel.CARD_EDGE_PX
 		val mapH = sidebarDimensions.appHeight - NativePanel.CARD_EDGE_PX
 		var w = displaySize.x
 		var h = w * mapH / mapW

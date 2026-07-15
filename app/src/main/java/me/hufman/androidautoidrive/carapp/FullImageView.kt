@@ -47,7 +47,7 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		get() = if (NativePanel.enabled) NativePanel.PANEL_WIDTH_PX else 0
 
 	private fun mapWidth(): Int =
-			if (nativePanelW > 0) config.rhmiDimensions.appWidth - nativePanelW - NativePanel.CARD_EDGE_PX
+			if (nativePanelW > 0) config.rhmiDimensions.visibleWidth - nativePanelW - NativePanel.CARD_EDGE_PX
 			else config.rhmiDimensions.visibleWidth
 
 	private fun mapHeight(): Int =
@@ -128,10 +128,11 @@ class FullImageView(val state: RHMIState, val title: String, val config: FullIma
 		inputList.setProperty(RHMIProperty.PropertyId.BOOKMARKABLE, true)
 
 		imageComponent.setVisible(true)
-		// panel natywny: mapa w obszarze tresci od razu za pasem panelu, karta od (0,0);
+		// panel natywny: karta podchodzi pod lewy pas paddingu (strefa strzalki BMW),
+		// wiec mapa zaczyna sie na -paddingLeft + szerokosc panelu; pion od linii belki (Y=0).
 		// tryb klasyczny: pelny ekran z korekta -padding (bleed pod belke, jak upstream)
 		if (nativePanelW > 0) {
-			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, nativePanelW)    // positionX
+			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft + nativePanelW)    // positionX
 			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_Y.id, 0)    // positionY
 		} else {
 			imageComponent.setProperty(RHMIProperty.PropertyId.POSITION_X.id, -config.rhmiDimensions.paddingLeft)    // positionX
